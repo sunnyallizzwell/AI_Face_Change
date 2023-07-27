@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a report to help us improve
+about: Create a report
 title: ''
 labels: ''
 assignees: ''
@@ -24,7 +24,7 @@ What OS are you using?
 - [ ] Windows 
 - [ ] Mac
 
-Are you try to use a GPU?
+Are you trying to use a GPU?
 - [ ] No. I am not using the `---gpu` flag
 - [ ] NVIDIA
 - [ ] AMD
