@@ -236,6 +236,7 @@ def run():
                     with gr.Column():
                         settings_controls.append(gr.Checkbox(label="Public Server", value=roop.globals.CFG.server_share, elem_id='server_share', interactive=True))
                         settings_controls.append(gr.Checkbox(label='Clear output folder before each run', value=roop.globals.CFG.clear_output, elem_id='clear_output', interactive=True))
+                        output_template = gr.Textbox(label="Output Template", lines=1, info="The output format supporting template replacement. The extension will be added automatically. {file}: The input filename; {dt} The current epoch timestamp", value=roop.globals.CFG.output_template)
                     with gr.Column():
                         input_server_name = gr.Textbox(label="Server Name", lines=1, info="Leave blank to run locally", value=roop.globals.CFG.server_name)
                     with gr.Column():
@@ -320,7 +321,7 @@ def run():
             video_quality.input(fn=lambda a,b='video_quality':on_settings_changed_misc(a,b), inputs=[video_quality])
 
             button_clean_temp.click(fn=clean_temp, outputs=[bt_srcimg, input_faces, target_faces, bt_destfiles])
-            button_apply_settings.click(apply_settings, inputs=[themes, input_server_name, input_server_port])
+            button_apply_settings.click(apply_settings, inputs=[themes, input_server_name, input_server_port, output_template])
             button_apply_restart.click(restart)
 
 
@@ -731,7 +732,7 @@ def on_join_videos(files):
     filenames = []
     for f in files:
         filenames.append(f.name)
-    destfile = util.get_destfilename_from_path(filenames[0], './output', '_join')        
+    destfile = util.get_destfilename_from_path(filenames[0], './output', '_join')
     util.join_videos(filenames, destfile)
     resultfiles = []
     if os.path.isfile(destfile):
@@ -786,10 +787,11 @@ def clean_temp():
     return None,None,None,None
 
 
-def apply_settings(themes, input_server_name, input_server_port):
+def apply_settings(themes, input_server_name, input_server_port, output_template):
     roop.globals.CFG.selected_theme = themes
     roop.globals.CFG.server_name = input_server_name
     roop.globals.CFG.server_port = input_server_port
+    roop.globals.CFG.output_template = output_template
     roop.globals.CFG.save()
     show_msg('Settings saved')
 

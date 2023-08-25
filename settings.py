@@ -36,6 +36,7 @@ class Settings:
         self.frame_buffer_size = self.default_get(data, 'frame_buffer_size', 4)
         self.provider = self.default_get(data, 'provider', 'cuda')
         self.force_cpu = self.default_get(data, 'force_cpu', False)
+        self.output_template = self.default_get(data, 'output_template', '{file}.fake.{dt}')
 
 
 
@@ -56,7 +57,8 @@ class Settings:
             'memory_limit' : self.memory_limit,
             'frame_buffer_size' : self.frame_buffer_size,
             'provider' : self.provider,
-            'force_cpu' : self.force_cpu
+            'force_cpu' : self.force_cpu,
+			'output_template' : self.output_template
         }
         with open(self.config_file, 'w') as f:
             yaml.dump(data, f)
