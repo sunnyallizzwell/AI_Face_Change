@@ -369,11 +369,16 @@ def batch_process(files, use_clip, new_clip_text, use_new_method) -> None:
                     util.create_gif_from_video(video_file_name, destination)
                     if os.path.isfile(destination):
                         os.remove(video_file_name)
-                elif not roop.globals.skip_audio:
+                else:
+                    skip_audio = roop.globals.skip_audio
                     destination = util.replace_template(video_file_name)
-                    util.restore_audio(video_file_name, v, destination)
-                    if os.path.isfile(destination):
-                        os.remove(video_file_name)
+
+                    if not skip_audio:
+                        util.restore_audio(video_file_name, v, destination)
+                        if os.path.isfile(destination):
+                            os.remove(video_file_name)
+                    else:
+                        shutil.move(video_file_name, destination)
                 update_status(f'\nProcessing {os.path.basename(destination)} took {time() - start_processing} secs')
 
             else:
