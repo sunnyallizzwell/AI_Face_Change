@@ -10,6 +10,7 @@ import urllib
 import torch
 import gradio
 import tempfile
+import time
 
 from pathlib import Path
 from typing import List, Any
@@ -83,7 +84,7 @@ def create_gif_from_video(video_path: str, gif_path):
     fps = detect_fps(video_path)
     frame = get_video_frame(video_path)
 
-    run_ffmpeg(['-i', video_path, '-vf', f'fps={fps},scale={frame.shape[0]}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse', '-loop', '0', gif_path])
+    run_ffmpeg(['-i', video_path, '-vf', f'fps={fps},scale={frame.shape[1]}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse', '-loop', '0', gif_path])
 
 
 def restore_audio(intermediate_video: str, original_video: str, final_video: str) -> None:
