@@ -10,7 +10,8 @@ import urllib
 import torch
 import gradio
 import tempfile
-import time
+
+from datetime import datetime
 
 from pathlib import Path
 from typing import List, Any
@@ -122,19 +123,23 @@ def get_destfilename_from_path(srcfilepath: str, destfilepath: str, extension: s
         return os.path.join(destfilepath, f'{fn}{extension}')
     return os.path.join(destfilepath, f'{fn}{extension}{ext}')
 
-def replace_template(file_path: str):
+def replace_template(file_path: str, index: int = 0):
     fn, ext = os.path.splitext(os.path.basename(file_path))
-
+    
     # Remove the "__temp" placeholder that was used as a temporary filename
     fn = fn.replace('__temp', '')
+    now = datetime.now()
+    timestamp = int(now.timestamp())
 
-    current_dt = int(time.time())
     template = roop.globals.CFG.output_template
 
     # Replace placeholders with actual values
     replaced_filename = template \
         .replace("{file}", fn) \
-        .replace("{dt}", str(current_dt))
+        .replace("{i}", str(index)) \
+        .replace("{date}", now.strftime("%Y-%m-%d")) \
+        .replace("{time}", now.strftime("%H-%M-%S")) \
+        .replace("{timestamp}", str(timestamp))
 
     return os.path.join(roop.globals.output_path, f'{replaced_filename}{ext}')
 
