@@ -314,7 +314,11 @@ def batch_process(files, use_clip, new_clip_text, use_new_method) -> None:
         if util.has_image_extension(fullname):
             imagefiles.append(fullname)
             destination = util.get_destfilename_from_path(fullname, roop.globals.output_path, f'.{roop.globals.CFG.output_image_format}')
-            imagefinalnames.append(util.replace_template(destination, index=index))
+            destination = util.replace_template(destination, index=index)
+
+            pathlib.Path(os.path.dirname(destination)).mkdir(parents=True, exist_ok=True)
+
+            imagefinalnames.append(destination)
         elif util.is_video(fullname) or util.has_extension(fullname, ['gif']):
             videofiles.append(fullname)
             destination = util.get_destfilename_from_path(fullname, roop.globals.output_path, f'__temp.{roop.globals.CFG.output_video_format}')
