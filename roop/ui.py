@@ -83,6 +83,13 @@ def run():
     run_server = True
     mycss = """
         span {color: var(--block-info-text-color)}
+        .markdown_group_fix .block {
+            background: var(--block-background-fill);
+            padding: 8px;
+        }
+        .markdown_group_fix h2 {
+            margin-top: 0 !important;
+        }
         #filelist {
             max-height: 238.4px;
             overflow-y: auto !important;
@@ -236,12 +243,13 @@ def run():
                     with gr.Column():
                         settings_controls.append(gr.Checkbox(label="Public Server", value=roop.globals.CFG.server_share, elem_id='server_share', interactive=True))
                         settings_controls.append(gr.Checkbox(label='Clear output folder before each run', value=roop.globals.CFG.clear_output, elem_id='clear_output', interactive=True))
-                        with gr.Group():
+
+                        with gr.Group(elem_classes=["markdown_group_fix"]):
                             gr.Markdown("""
                                 ## Output Template
 
                                 The output format supporting template replacement.  
-                                The extension will be added automatically.
+                                The file extension will be added automatically.
                             """)
                             with gr.Accordion(label="Template Parameters", open=False):
                                 gr.Markdown("""
