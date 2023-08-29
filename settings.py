@@ -36,7 +36,7 @@ class Settings:
         self.frame_buffer_size = self.default_get(data, 'frame_buffer_size', 4)
         self.provider = self.default_get(data, 'provider', 'cuda')
         self.force_cpu = self.default_get(data, 'force_cpu', False)
-        self.output_template = self.default_get(data, 'output_template', '{file}.fake.{timestamp}')
+        self.output_template = self.default_get(data, 'output_template', '{date}/{i}.{time}.{file}')
 
 
 
