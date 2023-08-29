@@ -11,10 +11,14 @@ import torch
 import gradio
 import tempfile
 
+from datetime import datetime
+
 from pathlib import Path
 from typing import List, Any
 from tqdm import tqdm
 from scipy.spatial import distance
+
+import roop.template_parser as template_parser
 
 import roop.globals
 
@@ -83,7 +87,7 @@ def create_gif_from_video(video_path: str, gif_path):
     fps = detect_fps(video_path)
     frame = get_video_frame(video_path)
 
-    run_ffmpeg(['-i', video_path, '-vf', f'fps={fps},scale={frame.shape[0]}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse', '-loop', '0', gif_path])
+    run_ffmpeg(['-i', video_path, '-vf', f'fps={fps},scale={frame.shape[1]}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse', '-loop', '0', gif_path])
 
 
 def restore_audio(intermediate_video: str, original_video: str, final_video: str) -> None:
@@ -121,7 +125,19 @@ def get_destfilename_from_path(srcfilepath: str, destfilepath: str, extension: s
         return os.path.join(destfilepath, f'{fn}{extension}')
     return os.path.join(destfilepath, f'{fn}{extension}{ext}')
 
+def replace_template(file_path: str, index: int = 0):
+    fn, ext = os.path.splitext(os.path.basename(file_path))
+    
+    # Remove the "__temp" placeholder that was used as a temporary filename
+    fn = fn.replace('__temp', '')
 
+    template = roop.globals.CFG.output_template
+    replaced_filename = template_parser.parse(template, {
+        'index': str(index),
+        'file': fn
+    })
+
+    return os.path.join(roop.globals.output_path, f'{replaced_filename}{ext}')
 
 
 def create_temp(target_path: str) -> None:

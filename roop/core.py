@@ -14,6 +14,7 @@ import signal
 import argparse
 import torch
 import onnxruntime
+import pathlib
 #import tensorflow
 
 from time import time
@@ -304,17 +305,24 @@ def batch_process(files, use_clip, new_clip_text, use_new_method) -> None:
         update_status('Sorting videos/images')
 
 
-    for f in files:
+    for index, f in enumerate(files):
         if need_join:
             fullname = os.path.join(roop.globals.target_folder_path, f)
         else:
             fullname = f
+
         if util.has_image_extension(fullname):
             imagefiles.append(fullname)
-            imagefinalnames.append(util.get_destfilename_from_path(fullname, roop.globals.output_path, f'_fake.{roop.globals.CFG.output_image_format}'))
+            destination = util.get_destfilename_from_path(fullname, roop.globals.output_path, f'.{roop.globals.CFG.output_image_format}')
+            destination = util.replace_template(destination, index=index)
+
+            pathlib.Path(os.path.dirname(destination)).mkdir(parents=True, exist_ok=True)
+
+            imagefinalnames.append(destination)
         elif util.is_video(fullname) or util.has_extension(fullname, ['gif']):
             videofiles.append(fullname)
-            videofinalnames.append(util.get_destfilename_from_path(fullname, roop.globals.output_path, f'_fake.{roop.globals.CFG.output_video_format}'))
+            destination = util.get_destfilename_from_path(fullname, roop.globals.output_path, f'__temp.{roop.globals.CFG.output_video_format}')
+            videofinalnames.append(destination)
 
 
     if(len(imagefiles) > 0):
@@ -356,20 +364,34 @@ def batch_process(files, use_clip, new_clip_text, use_new_method) -> None:
                 end_processing('Processing stopped!')
                 return
             
-            if os.path.isfile(videofinalnames[index]):
+            video_file_name = videofinalnames[index]
+            if os.path.isfile(video_file_name):
+                destination = ''
                 if util.has_extension(v, ['gif']):
-                    gifname = util.get_destfilename_from_path(v, './output', '_fake.gif')
+                    gifname = util.get_destfilename_from_path(v, './output', '.gif')
+                    destination = util.replace_template(gifname, index=index)
+
+                    pathlib.Path(os.path.dirname(destination)).mkdir(parents=True, exist_ok=True)
+
                     update_status('Creating final GIF')
-                    util.create_gif_from_video(videofinalnames[index], gifname)
-                elif not roop.globals.skip_audio:
-                    finalname = util.get_destfilename_from_path(videofinalnames[index], roop.globals.output_path, f'_final.{roop.globals.CFG.output_video_format}')
-                    util.restore_audio(videofinalnames[index], v, finalname)
-                    if os.path.isfile(finalname):
-                        os.remove(videofinalnames[index])
-                update_status(f'\nProcessing {os.path.basename(videofinalnames[index])} took {time() - start_processing} secs')
+                    util.create_gif_from_video(video_file_name, destination)
+                    if os.path.isfile(destination):
+                        os.remove(video_file_name)
+                else:
+                    skip_audio = roop.globals.skip_audio
+                    destination = util.replace_template(video_file_name, index=index)
+                    pathlib.Path(os.path.dirname(destination)).mkdir(parents=True, exist_ok=True)
+
+                    if not skip_audio:
+                        util.restore_audio(video_file_name, v, destination)
+                        if os.path.isfile(destination):
+                            os.remove(video_file_name)
+                    else:
+                        shutil.move(video_file_name, destination)
+                update_status(f'\nProcessing {os.path.basename(destination)} took {time() - start_processing} secs')
 
             else:
-                update_status(f'Failed processing {os.path.basename(videofinalnames[index])}!')
+                update_status(f'Failed processing {os.path.basename(video_file_name)}!')
             release_resources()
     end_processing('Finished')
 
