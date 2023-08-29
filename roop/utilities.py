@@ -18,6 +18,8 @@ from typing import List, Any
 from tqdm import tqdm
 from scipy.spatial import distance
 
+import roop.template_parser as template_parser
+
 import roop.globals
 
 TEMP_FILE = 'temp.mp4'
@@ -128,18 +130,12 @@ def replace_template(file_path: str, index: int = 0):
     
     # Remove the "__temp" placeholder that was used as a temporary filename
     fn = fn.replace('__temp', '')
-    now = datetime.now()
-    timestamp = int(now.timestamp())
 
     template = roop.globals.CFG.output_template
-
-    # Replace placeholders with actual values
-    replaced_filename = template \
-        .replace("{file}", fn) \
-        .replace("{i}", str(index)) \
-        .replace("{date}", now.strftime("%Y-%m-%d")) \
-        .replace("{time}", now.strftime("%H-%M-%S")) \
-        .replace("{timestamp}", str(timestamp))
+    replaced_filename = template_parser.parse(template, {
+        'index': str(index),
+        'file': fn
+    })
 
     return os.path.join(roop.globals.output_path, f'{replaced_filename}{ext}')
 
