@@ -25,7 +25,7 @@ NAME = 'ROOP.FACE-ENHANCER'
 
 def pre_check() -> bool:
     download_directory_path = resolve_relative_path('../models')
-    conditional_download(download_directory_path, ['https://huggingface.co/henryruhs/roop/resolve/main/GFPGANv1.4.pth'])
+    conditional_download(download_directory_path, ['https://huggingface.co/CountFloyd/deepfake/resolve/main/GFPGANv1.4.pth'])
     conditional_download(download_directory_path, ['https://github.com/csxmli2016/DMDNet/releases/download/v1/DMDNet.pth'])
     conditional_download(download_directory_path, ['https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth'])
     return True

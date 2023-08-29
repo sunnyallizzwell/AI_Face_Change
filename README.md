@@ -1,4 +1,4 @@
-# roop-unleashed
+# Frozen old TkInter Version of roop-unleashed v2.0.3
 
 [Changelog](#changelog) • [Installation](#installation) • [Usage](#usage) • [Example](#example) • [FAQ](#faq)
 

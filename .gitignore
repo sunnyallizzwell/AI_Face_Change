@@ -1,8 +1,10 @@
 .vs
 .idea
+.vscode
 models
 temp
 __pycache__
 *.pth
 /start.bat
 /env
+run.bat

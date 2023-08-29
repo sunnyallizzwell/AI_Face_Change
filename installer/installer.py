@@ -31,7 +31,7 @@ def check_env():
 def install_dependencies():
     # Install Git and clone repo
     run_cmd("conda install -y -k git")
-    run_cmd("git clone https://github.com/C0untFloyd/roop-unleashed.git")
+    run_cmd("git clone -b tkinter --single-branch https://github.com/C0untFloyd/roop-unleashed.git")
 
     # Install the webui dependencies
     update_dependencies()
