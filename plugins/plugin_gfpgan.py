@@ -65,7 +65,7 @@ class GFPGAN(ChainImgPlugin):
                 temp_face, start_x, start_y, end_x, end_y = self.cutout(temp_frame, start_x, start_y, end_x, end_y, 0.5)
                 if temp_face.size:
                     temp_face = self.enhance(temp_face)
-                    temp_frame = self.paste_into(temp_face, temp_frame, start_x, start_y, end_x, end_y, False)
+                    temp_frame = self.paste_into(temp_face, temp_frame, start_x, start_y, end_x, end_y, True)
         else:
             temp_frame = self.enhance(temp_frame)
 

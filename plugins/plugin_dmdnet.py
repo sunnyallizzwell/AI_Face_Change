@@ -84,7 +84,7 @@ class DMDNETPlugin(ChainImgPlugin):
                 if temp_face.size:
                     temp_face = self.enhance_face(params["input_face_datas"][0], temp_face, face, start_x, start_y)
                     temp_face = cv2.resize(temp_face, (end_x - start_x,end_y - start_y), interpolation = cv2.INTER_LANCZOS4)
-                    temp_frame = self.paste_into(temp_face, temp_frame, start_x, start_y, end_x, end_y, False)
+                    temp_frame = self.paste_into(temp_face, temp_frame, start_x, start_y, end_x, end_y, True)
 
 
         if not "blend_ratio" in params: 

@@ -200,6 +200,13 @@ def conditional_download(download_directory_path: str, urls: List[str]) -> None:
             with tqdm(total=total, desc=f'Downloading {url}', unit='B', unit_scale=True, unit_divisor=1024) as progress:
                 urllib.request.urlretrieve(url, download_file_path, reporthook=lambda count, block_size, total_size: progress.update(block_size)) # type: ignore[attr-defined]
 
+def get_local_files_from_folder(folder:str):
+    if not os.path.exists(folder) or not os.path.isdir(folder):
+        return None
+    files = [os.path.join(folder, f) for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))]
+    return files
+    
+
 
 def resolve_relative_path(path: str) -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), path))

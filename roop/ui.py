@@ -84,7 +84,7 @@ def run():
     mycss = """
         span {color: var(--block-info-text-color)}
         #filelist {
-            max-height: 238.4px;
+            max-height: 219px;
             overflow-y: auto !important;
         }
 """
@@ -113,6 +113,8 @@ def run():
                         target_faces = gr.Gallery(label="Target faces", allow_preview=True, preview=True, height=128, object_fit="scale-down")
                         with gr.Row():
                                 bt_remove_selected_target_face = gr.Button("Remove selected")
+                                bt_add_local = gr.Button('Add local files from')
+                                local_folder = gr.Textbox(show_label=False, placeholder="/content/", interactive=True)
                         bt_destfiles = gr.Files(label='Target File(s)', file_count="multiple", elem_id='filelist')
                 with gr.Row():
                     with gr.Column(visible=False) as dynamic_face_selection:
@@ -230,13 +232,13 @@ def run():
                         
             
             with gr.Tab("Settings"):
-                with gr.Row():
+                with gr.Row(variant='compact', equal_height=True):
                     with gr.Column():
                         themes = gr.Dropdown(available_themes, label="Theme", info="Change needs complete restart", value=roop.globals.CFG.selected_theme)
                     with gr.Column():
                         settings_controls.append(gr.Checkbox(label="Public Server", value=roop.globals.CFG.server_share, elem_id='server_share', interactive=True))
                         settings_controls.append(gr.Checkbox(label='Clear output folder before each run', value=roop.globals.CFG.clear_output, elem_id='clear_output', interactive=True))
-                        output_template = gr.Textbox(label="Output Template", info="(The file extension is added automatically)", lines=1, value=roop.globals.CFG.output_template)
+                        output_template = gr.Textbox(label="Filename Output Template", info="(file extension is added automatically)", lines=1, placeholder='{file}_{time}', value=roop.globals.CFG.output_template)
                     with gr.Column():
                         input_server_name = gr.Textbox(label="Server Name", lines=1, info="Leave blank to run locally", value=roop.globals.CFG.server_name)
                     with gr.Column():
@@ -287,6 +289,8 @@ def run():
             chk_det_size.select(fn=on_option_changed)
 
             bt_preview_mask.click(fn=on_preview_mask, inputs=[preview_frame_num, bt_destfiles, clip_text], outputs=[maskpreview]) 
+
+            bt_add_local.click(fn=on_add_local_folder, inputs=[local_folder], outputs=[bt_destfiles])
 
             start_event = bt_start.click(fn=start_swap, 
                 inputs=[selected_enhancer, selected_face_detection, roop.globals.keep_fps, roop.globals.keep_frames,
@@ -376,6 +380,12 @@ def on_settings_changed(evt: gr.SelectData):
             
     raise gr.Error(f'Unhandled Setting for {evt.target}')
 
+
+def on_add_local_folder(folder):
+    files = util.get_local_files_from_folder(folder)
+    if files is None:
+        gr.Warning("Empty folder or folder not found!")
+    return files
 
 
 def on_srcimg_changed(imgsrc, progress=gr.Progress()):
