@@ -11,10 +11,14 @@ import torch
 import gradio
 import tempfile
 
+from datetime import datetime
+
 from pathlib import Path
 from typing import List, Any
 from tqdm import tqdm
 from scipy.spatial import distance
+
+import roop.template_parser as template_parser
 
 import roop.globals
 
@@ -64,27 +68,12 @@ def join_videos(videos: List[str], dest_filename: str):
         filter += f'[{i}:v:0][{i}:a:0]'
     run_ffmpeg([" ".join(inputs), '-filter_complex', f'"{filter}concat=n={len(videos)}:v=1:a=1[outv][outa]"', '-map', '"[outv]"', '-map', '"[outa]"', dest_filename])    
 
-# def extract_frames(target_path: str) -> None:
-#     create_temp(target_path)
-#     temp_directory_path = get_temp_directory_path(target_path)
-#     run_ffmpeg(['-i', target_path, '-q:v', '1', '-pix_fmt', 'rgb24', os.path.join(temp_directory_path, f'%04d.{roop.globals.CFG.output_image_format}')])
-#     return temp_directory_path
-
-
-def extract_frames(target_path : str, trim_frame_start, trim_frame_end, fps : float) -> bool:
+def extract_frames(target_path: str) -> None:
     create_temp(target_path)
     temp_directory_path = get_temp_directory_path(target_path)
-    commands = ['-i', target_path, '-q:v', '1', '-pix_fmt', 'rgb24', ]
-    if trim_frame_start is not None and trim_frame_end is not None:
-        commands.extend([ '-vf', 'trim=start_frame=' + str(trim_frame_start) + ':end_frame=' + str(trim_frame_end) + ',fps=' + str(fps) ])
-    # elif trim_frame_start is not None:
-	#     commands.extend([ '-vf', 'trim=start_frame=' + str(trim_frame_start) + ',fps=' + str(fps) ])
-    # elif trim_frame_end is not None:
-    # #     commands.extend([ '-vf', 'trim=end_frame=' + str(trim_frame_end) + ',fps=' + str(fps) ])
-    # else:
-	# 	commands.extend([ '-vf', 'fps=' + str(fps) ])
-    commands.extend([os.path.join(temp_directory_path, '%04d.' + roop.globals.CFG.output_image_format)])
-    return run_ffmpeg(commands)
+    run_ffmpeg(['-i', target_path, '-q:v', '1', '-pix_fmt', 'rgb24', os.path.join(temp_directory_path, f'%04d.{roop.globals.CFG.output_image_format}')])
+    return temp_directory_path
+
 
 def create_video(target_path: str, dest_filename: str, fps: float = 24.0) -> None:
     temp_directory_path = get_temp_directory_path(target_path)
@@ -98,30 +87,11 @@ def create_gif_from_video(video_path: str, gif_path):
     fps = detect_fps(video_path)
     frame = get_video_frame(video_path)
 
-    run_ffmpeg(['-i', video_path, '-vf', f'fps={fps},scale={frame.shape[0]}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse', '-loop', '0', gif_path])
+    run_ffmpeg(['-i', video_path, '-vf', f'fps={fps},scale={frame.shape[1]}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse', '-loop', '0', gif_path])
 
 
-def restore_audio(intermediate_video: str, original_video: str, trim_frame_start, trim_frame_end, final_video : str) -> None:
-	fps = detect_fps(original_video)
-	commands = [ '-i', intermediate_video, '-i', original_video ]
-	if trim_frame_start is None and trim_frame_end is None:
-		commands.extend([ '-c:a', 'copy' ])
-	else:
-		if trim_frame_start is not None:
-			start_time = trim_frame_start / fps
-			commands.extend([ '-ss', str(start_time) ])
-		else:
-			commands.extend([ '-ss', '0' ])
-		if trim_frame_end is not None:
-			end_time = trim_frame_end / fps
-			commands.extend([ '-to', str(end_time) ])
-		commands.extend([ '-c:a', 'aac' ])
-	commands.extend([ '-map', '0:v:0', '-map', '1:a:0', '-y', final_video ])
-	run_ffmpeg(commands)
-
-
-# def restore_audio(intermediate_video: str, original_video: str, final_video: str) -> None:
-#     run_ffmpeg(['-i', intermediate_video, '-i', original_video, '-c:v', 'copy', '-map', '0:v:0', '-map', '1:a:0', '-y', final_video])
+def restore_audio(intermediate_video: str, original_video: str, final_video: str) -> None:
+    run_ffmpeg(['-i', intermediate_video, '-i', original_video, '-c:v', 'copy', '-map', '0:v:0', '-map', '1:a:0', '-y', final_video])
 
 
 def get_temp_frame_paths(target_path: str) -> List[str]:
@@ -155,7 +125,19 @@ def get_destfilename_from_path(srcfilepath: str, destfilepath: str, extension: s
         return os.path.join(destfilepath, f'{fn}{extension}')
     return os.path.join(destfilepath, f'{fn}{extension}{ext}')
 
+def replace_template(file_path: str, index: int = 0):
+    fn, ext = os.path.splitext(os.path.basename(file_path))
+    
+    # Remove the "__temp" placeholder that was used as a temporary filename
+    fn = fn.replace('__temp', '')
 
+    template = roop.globals.CFG.output_template
+    replaced_filename = template_parser.parse(template, {
+        'index': str(index),
+        'file': fn
+    })
+
+    return os.path.join(roop.globals.output_path, f'{replaced_filename}{ext}')
 
 
 def create_temp(target_path: str) -> None:
@@ -217,6 +199,13 @@ def conditional_download(download_directory_path: str, urls: List[str]) -> None:
             total = int(request.headers.get('Content-Length', 0))
             with tqdm(total=total, desc=f'Downloading {url}', unit='B', unit_scale=True, unit_divisor=1024) as progress:
                 urllib.request.urlretrieve(url, download_file_path, reporthook=lambda count, block_size, total_size: progress.update(block_size)) # type: ignore[attr-defined]
+
+def get_local_files_from_folder(folder:str):
+    if not os.path.exists(folder) or not os.path.isdir(folder):
+        return None
+    files = [os.path.join(folder, f) for f in os.listdir(folder) if os.path.isfile(os.path.join(folder, f))]
+    return files
+    
 
 
 def resolve_relative_path(path: str) -> str:

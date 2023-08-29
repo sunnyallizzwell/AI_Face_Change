@@ -53,7 +53,6 @@ is_processing = False
 
 list_files_process : list[ProcessEntry] = []
 
-
 def prepare_environment():
     roop.globals.output_path = os.path.abspath(os.path.join(os.getcwd(), "output"))
     os.makedirs(roop.globals.output_path, exist_ok=True)
@@ -85,7 +84,7 @@ def run():
     mycss = """
         span {color: var(--block-info-text-color)}
         #fixedheight {
-            max-height: 238.4px;
+            max-height: 219;
             overflow-y: auto !important;
         }
 """
@@ -106,21 +105,20 @@ def run():
                 with gr.Row():
                     with gr.Column():
                         input_faces = gr.Gallery(label="Input faces", allow_preview=True, preview=True, height=128, object_fit="scale-down")
+                        with gr.Row():
+                            with gr.Column():
+                                mask_top = gr.Slider(0, 256, value=0, label="Offset Face Top", step=1.0, interactive=True)
+                            with gr.Column():
+                                bt_remove_selected_input_face = gr.Button("Remove selected", size='sm')
+                                bt_clear_input_faces = gr.Button("Clear all", variant='stop', size='sm')
                     with gr.Column():
                         target_faces = gr.Gallery(label="Target faces", allow_preview=True, preview=True, height=128, object_fit="scale-down")
-                with gr.Row():
-                        mask_top = gr.Slider(0, 256, value=0, label="Offset Face Top", step=1.0, interactive=True)
-                        with gr.Column():
-                            bt_remove_selected_input_face = gr.Button("Remove selected", size='sm')
-                            bt_clear_input_faces = gr.Button("Clear all", variant='stop', size='sm')
-                        with gr.Column():
-                            bt_remove_selected_target_face = gr.Button("Remove selected", size='sm')
-                        with gr.Column():
-                            bt_add_local = gr.Button('Add local files from', size='sm')
-                            local_folder = gr.Textbox(show_label=False, placeholder="/content/", interactive=True)
+                        with gr.Row():
+                            with gr.Column():
+                                bt_remove_selected_target_face = gr.Button("Remove selected", size='sm')
                 with gr.Row():
                     bt_srcimg = gr.Image(label='Source Face Image', type='filepath', tool=None)
-                    bt_destfiles = gr.Files(label='Target File(s)', file_count="multiple", elem_id='filelist')                
+                    bt_destfiles = gr.Files(label='Target File(s)', file_count="multiple", elem_id='fixedheight')
                 with gr.Row():
                     with gr.Column(visible=False) as dynamic_face_selection:
                         face_selection = gr.Gallery(label="Detected faces", allow_preview=True, preview=True, height=256, object_fit="scale-down")
@@ -170,7 +168,7 @@ def run():
                         with gr.Accordion(label="Results", open=True):
                             gr.Button("Open Output Folder", size='sm').click(fn=lambda: util.open_folder(util.resolve_relative_path('../output/')))
                             resultfiles = gr.Files(label='Processed File(s)', interactive=False)
-                            resultimage = gr.Image(type='filepath', interactive=False, )
+                            resultimage = gr.Image(type='filepath', interactive=False)
                     with gr.Column():
                         with gr.Accordion(label="Preview Original/Fake Frame", open=True):
                             previewimage = gr.Image(label="Preview Image", interactive=False)
@@ -248,7 +246,7 @@ def run():
                         
             
             with gr.Tab("Settings"):
-                with gr.Row():
+                with gr.Row(variant='compact', equal_height=True):
                     with gr.Column():
                         themes = gr.Dropdown(available_themes, label="Theme", info="Change needs complete restart", value=roop.globals.CFG.selected_theme)
                     with gr.Column():
@@ -301,12 +299,13 @@ def run():
 
             chk_det_size.select(fn=on_option_changed)
 
-            bt_add_local.click(fn=on_add_local_folder, inputs=[local_folder], outputs=[bt_destfiles])
             bt_preview_mask.click(fn=on_preview_mask, inputs=[preview_frame_num, bt_destfiles, clip_text], outputs=[maskpreview]) 
+
+            bt_add_local.click(fn=on_add_local_folder, inputs=[local_folder], outputs=[bt_destfiles])
 
             start_event = bt_start.click(fn=start_swap, 
                 inputs=[selected_enhancer, selected_face_detection, roop.globals.keep_fps, roop.globals.keep_frames,
-                         roop.globals.skip_audio, max_face_distance, blend_ratio, chk_useclip, clip_text,video_swapping_method],
+                         roop.globals.skip_audio, max_face_distance, blend_ratio, bt_destfiles, chk_useclip, clip_text,video_swapping_method],
                 outputs=[bt_start, resultfiles, resultimage])
             
             bt_stop.click(fn=stop_swap, cancels=[start_event])
@@ -354,7 +353,7 @@ def run():
             run_server = False
         try:
             while restart_server == False:
-                time.sleep(1.0)
+                time.sleep(2.0)
         except (KeyboardInterrupt, OSError):
             print("Keyboard interruption in main thread... closing server.")
             run_server = False
@@ -536,7 +535,7 @@ def on_end_face_selection():
     return gr.Column.update(visible=False), None
 
 
-def on_preview_frame_changed(frame_num, files, fake_preview, enhancer, detection, face_distance, blend_ratio, use_clip, clip_text, mask_top):
+def on_preview_frame_changed(frame_num, files, fake_preview, enhancer, detection, face_distance, blend_ratio, use_clip, clip_text):
     global SELECTED_INPUT_FACE_INDEX, is_processing
 
     from roop.core import live_swap
@@ -647,7 +646,6 @@ def start_swap( enhancer, detection, keep_fps, keep_frames, skip_audio, face_dis
 
     if list_files_process is None or len(list_files_process) <= 0:
         return gr.Button.update(variant="primary"), None, None
-    
     if roop.globals.CFG.clear_output:
         shutil.rmtree(roop.globals.output_path)
 
@@ -874,7 +872,6 @@ def apply_settings(themes, input_server_name, input_server_port, output_template
     roop.globals.CFG.output_template = output_template
     roop.globals.CFG.save()
     show_msg('Settings saved')
-
 
 def restart():
     global restart_server

@@ -65,7 +65,7 @@ class GFPGAN(ChainImgPlugin):
                 temp_face, start_x, start_y, end_x, end_y = self.cutout(temp_frame, start_x, start_y, end_x, end_y, 0.5)
                 if temp_face.size:
                     temp_face = self.enhance(temp_face)
-                    temp_frame = self.paste_into(temp_face, temp_frame, start_x, start_y, end_x, end_y, True)
+                    temp_frame = self.paste_into(temp_face, temp_frame, start_x, start_y, end_x, end_y, False)
         else:
             temp_frame = self.enhance(temp_frame)
 
@@ -79,8 +79,12 @@ class GFPGAN(ChainImgPlugin):
     def enhance(self, image_array):
         input_shape = image_array.shape
         image_array = self.pre_process(image_array)
-        ort_inputs = {self.name: image_array}
-        result = model_gfpgan.run(None, ort_inputs)[0][0]
+        io_binding = model_gfpgan.io_binding()           
+        io_binding.bind_cpu_input("input", image_array)
+        io_binding.bind_output("1288", "cuda")
+        model_gfpgan.run_with_iobinding(io_binding)
+        ort_outs = io_binding.copy_outputs_to_cpu()
+        result = ort_outs[0][0]
         result = self.post_process(result)
         result = cv2.resize(result, (input_shape[1], input_shape[0]))
         return result

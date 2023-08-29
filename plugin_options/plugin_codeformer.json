@@ -4,5 +4,5 @@
     "face_upsample": true,
     "skip_if_no_face": true,
     "upscale": 1,
-    "v": "3.0"
+    "v": "0.10"
 }

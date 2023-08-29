@@ -44,16 +44,21 @@ class ChainVideoImageProcessor(ChainImgProcessor):
         process = psutil.Process(os.getpid())
         memory_usage = process.memory_info().rss / 1024 / 1024 / 1024
         msg = 'memory_usage: ' + '{:.2f}'.format(memory_usage).zfill(5) + f' GB execution_threads {self.num_threads}'
-        progress.set_description(msg)
         progress.set_postfix({
             'memory_usage': '{:.2f}'.format(memory_usage).zfill(5) + 'GB',
             'execution_threads': self.num_threads
         })
         progress.update(1)
+        print(msg)
 
 
-    def read_frames_thread(self, cap, num_threads):
-        num_frame = -1
+
+    def read_frames_thread(self, cap, frame_start, frame_end, num_threads):
+        num_frame = 0
+        total_num = frame_end - frame_start
+        if frame_start > 0:
+                cap.set(cv2.CAP_PROP_POS_FRAMES,frame_start)
+
         while True and roop.globals.processing:
             ret, frame = cap.read()
             if not ret:
@@ -62,7 +67,10 @@ class ChainVideoImageProcessor(ChainImgProcessor):
                 break
                 
             num_frame += 1
-            self.frames_queue.put((num_frame,frame), block=True)
+            self.frames_queue.put((num_frame - 1,frame), block=True)
+            if num_frame == total_num:
+                break
+
         for _ in range(num_threads):
             self.frames_queue.put(None)
 
@@ -120,9 +128,10 @@ class ChainVideoImageProcessor(ChainImgProcessor):
             
 
 
-    def run_batch_chain(self, source_video, target_video, fps, threads:int = 1, buffersize=32, chain = None, params_frame_gen_func = None):
+    def run_batch_chain(self, source_video, target_video, frame_start, frame_end, fps, threads:int = 1, buffersize=32, chain = None, params_frame_gen_func = None):
         cap = cv2.VideoCapture(source_video)
-        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        # frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_count = (frame_end - frame_start) + 1
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
@@ -139,7 +148,7 @@ class ChainVideoImageProcessor(ChainImgProcessor):
         self.frames_queue = Queue(buffersize * self.num_threads)
         self.processed_queue = Queue()
 
-        readthread = Thread(target=self.read_frames_thread, args=(cap, threads))
+        readthread = Thread(target=self.read_frames_thread, args=(cap, frame_start, frame_end, threads))
         readthread.start()
 
 
@@ -164,3 +173,4 @@ class ChainVideoImageProcessor(ChainImgProcessor):
         # wait for the task to complete
         readthread.join()
         writethread.join()
+        cap.release()

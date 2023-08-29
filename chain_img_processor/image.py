@@ -1,5 +1,3 @@
-import numpy as np
-import cv2
 from jaa import JaaCore
 from roop.utilities import get_device
 
@@ -185,24 +183,6 @@ class ChainImgPlugin:
     
     def paste_into(self, clip, frame, start_x, start_y, end_x, end_y, smooth):
         if smooth:
-            img_white = np.full((clip.shape[0], clip.shape[1]), 0, dtype=float)
-            # img_white = cv2.warpAffine(img_white, mat_rev, img_shape)
-            # img_white[img_white > 20] = 255
-            mask_border = 20
-            img_white = cv2.rectangle(img_white, (mask_border, mask_border), 
-                                    (img_white.shape[1] - mask_border, img_white.shape[0]-mask_border), (255, 255, 255), -1)    
-            img_mask = img_white
-            t1 = 40
-            kernel = np.ones((t1, t1), np.uint8)
-            img_mask = cv2.erode(img_mask, kernel, iterations=2)
-            t1 = 20
-            kernel_size = (t1, t1)
-            blur_size = tuple(2 * j + 1 for j in kernel_size)
-            img_mask = cv2.GaussianBlur(img_mask, blur_size, 0)
-            img_mask /= 255
-            img_mask = np.reshape(img_mask, [img_mask.shape[0], img_mask.shape[1], 1])
-            frame_clip = frame[start_y:end_y, start_x:end_x]
-            clip = img_mask * clip + (1 - img_mask) * frame_clip
             frame[start_y:end_y, start_x:end_x] = clip
         else:
             frame[start_y:end_y, start_x:end_x] = clip

@@ -256,6 +256,16 @@ def inference_app(image, background_enhance, face_upsample, upscale, codeformer_
             with torch.no_grad():
                 output = codeformer_net(cropped_face_t, w=codeformer_fidelity, adain=True)[0]
                 restored_face = tensor2img(output, rgb2bgr=True, min_max=(-1, 1))
+                
+                torch.onnx.export(codeformer_net,
+                (cropped_face_t,codeformer_fidelity),
+                "models/codeformer.onnx", 
+                export_params=True,
+                opset_version=11,
+                do_constant_folding=True,
+                input_names = ['x','w'],
+                output_names = ['y'])
+
             del output
         except RuntimeError as error:
             print(f"Failed inference for CodeFormer: {error}")
