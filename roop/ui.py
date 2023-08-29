@@ -236,7 +236,7 @@ def run():
                     with gr.Column():
                         settings_controls.append(gr.Checkbox(label="Public Server", value=roop.globals.CFG.server_share, elem_id='server_share', interactive=True))
                         settings_controls.append(gr.Checkbox(label='Clear output folder before each run', value=roop.globals.CFG.clear_output, elem_id='clear_output', interactive=True))
-                        output_template = gr.Textbox(label="Output Template", lines=1, value=roop.globals.CFG.output_template)
+                        output_template = gr.Textbox(label="Output Template", info="(The file extension is added automatically)", lines=1, value=roop.globals.CFG.output_template)
                     with gr.Column():
                         input_server_name = gr.Textbox(label="Server Name", lines=1, info="Leave blank to run locally", value=roop.globals.CFG.server_name)
                     with gr.Column():
