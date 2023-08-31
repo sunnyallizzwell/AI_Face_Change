@@ -16,6 +16,8 @@ from typing import List, Any
 from tqdm import tqdm
 from scipy.spatial import distance
 
+import roop.template_parser as template_parser
+
 import roop.globals
 
 TEMP_FILE = 'temp.mp4'
@@ -155,6 +157,19 @@ def get_destfilename_from_path(srcfilepath: str, destfilepath: str, extension: s
         return os.path.join(destfilepath, f'{fn}{extension}')
     return os.path.join(destfilepath, f'{fn}{extension}{ext}')
 
+def replace_template(file_path: str, index: int = 0):
+    fn, ext = os.path.splitext(os.path.basename(file_path))
+    
+    # Remove the "__temp" placeholder that was used as a temporary filename
+    fn = fn.replace('__temp', '')
+
+    template = roop.globals.CFG.output_template
+    replaced_filename = template_parser.parse(template, {
+        'index': str(index),
+        'file': fn
+    })
+
+    return os.path.join(roop.globals.output_path, f'{replaced_filename}{ext}')
 
 
 

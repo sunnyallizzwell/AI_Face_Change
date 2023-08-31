@@ -641,7 +641,7 @@ def translate_swap_mode(dropdown_text):
 
 
 def start_swap( enhancer, detection, keep_fps, keep_frames, skip_audio, face_distance, blend_ratio,
-                use_clip, clip_text, processing_method, progress=gr.Progress(track_tqdm=True)):
+                use_clip, clip_text, processing_method, progress=gr.Progress(track_tqdm=False)):
     from roop.core import batch_process
     global is_processing, list_files_process
 

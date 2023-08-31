@@ -5,7 +5,6 @@ import threading
 
 import roop.globals
 import roop.processors.frame.core
-from roop.core import update_status
 from roop.face_util import get_first_face, get_all_faces
 from roop.typing import Face, Frame
 from roop.utilities import conditional_download, resolve_relative_path, is_image, is_video, compute_cosine_distance, get_destfilename_from_path
@@ -34,15 +33,6 @@ def pre_check() -> bool:
 
 
 def pre_start() -> bool:
-    if not is_image(roop.globals.source_path):
-        update_status('Select an image for source path.')
-        return False
-    elif not get_first_face(cv2.imread(roop.globals.source_path)):
-        update_status('No face in source path detected.')
-        return False
-    if not is_image(roop.globals.target_path) and not is_video(roop.globals.target_path):
-        update_status('Select an image or video for target path.')
-        return False
     return True
 
 

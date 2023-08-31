@@ -18,6 +18,8 @@ class Enhance_CodeFormer():
     model_codeformer = None
 
     processorname = 'codeformer'
+    type = 'enhance'
+
 
     def Initialize(self):
         if self.model_codeformer is None:
@@ -26,9 +28,9 @@ class Enhance_CodeFormer():
 
 
     def Run(self, source_face: Face, target_face: Face, temp_frame: Frame) -> Frame:
-        input_shape = temp_frame.shape
+        input_size = temp_frame.shape[1]
         # preprocess
-        temp_frame = cv2.resize(temp_frame, (512, 512))
+        temp_frame = cv2.resize(temp_frame, (512, 512), cv2.INTER_CUBIC)
         temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_BGR2RGB)
         temp_frame = temp_frame.astype('float32') / 255.0
         temp_frame = (temp_frame - 0.5) / 0.5
@@ -55,9 +57,8 @@ class Enhance_CodeFormer():
 
         result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
         result = (result * 255.0).round()
-        # result = cv2.resize(result, (input_shape[1], input_shape[0]))
-        
-        return result.astype(np.uint8)
+        scale_factor = int(result.shape[1] / input_size)       
+        return result.astype(np.uint8), scale_factor
 
 
     def Release(self):

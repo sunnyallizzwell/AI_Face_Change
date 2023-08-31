@@ -14,8 +14,8 @@ import signal
 import argparse
 import torch
 import onnxruntime
-import tensorflow
 import pathlib
+#import tensorflow
 
 from time import time
 
@@ -26,16 +26,11 @@ import roop.ui as ui
 from settings import Settings
 from roop.face_util import extract_face_images
 from chain_img_processor import ChainImgProcessor, ChainVideoProcessor, ChainBatchImageProcessor, ChainVideoImageProcessor
-from roop.ProcessEntry import ProcessEntry
-from roop.ProcessMgr import ProcessMgr
-from roop.ProcessOptions import ProcessOptions
-
 
 clip_text = None
 
 call_display_ui = None
 
-process_mgr = None
 
 
 if 'ROCMExecutionProvider' in roop.globals.execution_providers:
@@ -100,6 +95,16 @@ def decode_execution_providers(execution_providers: List[str]) -> List[str]:
     return [provider for provider, encoded_execution_provider in zip(onnxruntime.get_available_providers(), encode_execution_providers(onnxruntime.get_available_providers()))
             if any(execution_provider in encoded_execution_provider for execution_provider in execution_providers)]
 
+def set_execution_provider(execution_provider: str):
+    longname = decode_execution_providers([execution_provider])[0]
+    allproviders = onnxruntime.get_available_providers()
+    unsupported = ['TensorrtExecutionProvider']
+    filtered = filter(lambda i: i not in unsupported, allproviders)
+    allproviders = list(filtered)
+    if allproviders[0] != longname:
+        allproviders.remove(longname)
+        allproviders.insert(0, longname)
+    roop.globals.execution_providers = allproviders
 
 def suggest_max_memory() -> int:
     if platform.system().lower() == 'darwin':
@@ -121,11 +126,11 @@ def suggest_execution_threads() -> int:
 
 def limit_resources() -> None:
     # prevent tensorflow memory leak
-    gpus = tensorflow.config.experimental.list_physical_devices('GPU')
-    for gpu in gpus:
-        tensorflow.config.experimental.set_virtual_device_configuration(gpu, [
-            tensorflow.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)
-        ])
+    # gpus = tensorflow.config.experimental.list_physical_devices('GPU')
+    # for gpu in gpus:
+    #     tensorflow.config.experimental.set_virtual_device_configuration(gpu, [
+    #         tensorflow.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)
+    #     ])
     # limit memory usage
     if roop.globals.max_memory:
         memory = roop.globals.max_memory * 1024 ** 3
@@ -164,7 +169,6 @@ def pre_check() -> bool:
     download_directory_path = util.resolve_relative_path('../models/CLIP')
     util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/rd64-uni-refined.pth'])
     download_directory_path = util.resolve_relative_path('../models/CodeFormer')
-    util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/CodeFormerv0.1.onnx'])
     util.conditional_download(download_directory_path, ['https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth'])
     download_directory_path = util.resolve_relative_path('../models/CodeFormer/facelib')
     util.conditional_download(download_directory_path, ['https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/detection_Resnet50_Final.pth'])
@@ -230,34 +234,24 @@ def get_processing_plugins(use_clip):
     return processors
 
 
-def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0, mask_top=0):
-    global process_mgr
-
+def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0):
     if frame is None:
         return frame
 
-    if process_mgr is None:
-        process_mgr = ProcessMgr()
-    
-    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, 20, swap_mode, selected_index, mask_top)
-
-    process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)
-    frame = process_mgr.process_frame(frame)
-
-    # InitPlugins()
-    # processors = get_processing_plugins(use_clip)
+    InitPlugins()
+    processors = get_processing_plugins(use_clip)
 
 
-    # temp_frame, _ = roop.globals.IMAGE_CHAIN_PROCESSOR.run_chain(frame,  
-    #                                                 {"swap_mode": swap_mode,
-    #                                                     "original_frame": frame,
-    #                                                     "blend_ratio": roop.globals.blend_ratio,
-    #                                                     "selected_index": selected_index,
-    #                                                     "face_distance_threshold": roop.globals.distance_threshold,
-    #                                                     "input_face_datas": roop.globals.INPUT_FACES, "target_face_datas": roop.globals.TARGET_FACES,
-    #                                                     "clip_prompt": clip_text},
-    #                                                     processors)
-    return frame
+    temp_frame, _ = roop.globals.IMAGE_CHAIN_PROCESSOR.run_chain(frame,  
+                                                    {"swap_mode": swap_mode,
+                                                        "original_frame": frame,
+                                                        "blend_ratio": roop.globals.blend_ratio,
+                                                        "selected_index": selected_index,
+                                                        "face_distance_threshold": roop.globals.distance_threshold,
+                                                        "input_face_datas": roop.globals.INPUT_FACES, "target_face_datas": roop.globals.TARGET_FACES,
+                                                        "clip_prompt": clip_text},
+                                                        processors)
+    return temp_frame
     
 def preview_mask(frame, clip_text):
     import numpy as np
@@ -282,8 +276,8 @@ def params_gen_func(proc, frame):
              "input_face_datas": roop.globals.INPUT_FACES, "target_face_datas": roop.globals.TARGET_FACES,
              "clip_prompt": clip_text}
 
-def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_method) -> None:
-    global clip_text, process_mgr
+def batch_process(files, use_clip, new_clip_text, use_new_method) -> None:
+    global clip_text
 
     roop.globals.processing = True
     InitPlugins()
@@ -293,69 +287,90 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
 
     clip_text = new_clip_text
 
-    imagefiles:list[ProcessEntry] = []
-    videofiles:list[ProcessEntry] = []
-           
-    update_status('Sorting videos/images')
+    imagefiles = []
+    imagefinalnames = []
+    videofiles = []
+    videofinalnames = []
+    need_join = False
+
+    if files is None:
+        need_join = True
+        if roop.globals.target_folder_path is None:
+            roop.globals.target_folder_path = os.path.dirname(roop.globals.target_path)
+            files = [os.path.basename(roop.globals.target_path)]
+            roop.globals.output_path = os.path.dirname(roop.globals.output_path)
+        else:
+            files = [f for f in os.listdir(roop.globals.target_folder_path) if os.path.isfile(os.path.join(roop.globals.target_folder_path, f))]
+            
+        update_status('Sorting videos/images')
 
 
-    for f in files:
-        fullname = f.filename
+    for index, f in enumerate(files):
+        if need_join:
+            fullname = os.path.join(roop.globals.target_folder_path, f)
+        else:
+            fullname = f
+
         if util.has_image_extension(fullname):
+            imagefiles.append(fullname)
             destination = util.get_destfilename_from_path(fullname, roop.globals.output_path, f'.{roop.globals.CFG.output_image_format}')
             destination = util.replace_template(destination, index=index)
-            pathlib.Path(os.path.dirname(destination)).mkdir(parents=True, exist_ok=True)
-            f.finalname = destination
-            imagefiles.append(f)
 
+            pathlib.Path(os.path.dirname(destination)).mkdir(parents=True, exist_ok=True)
+
+            imagefinalnames.append(destination)
         elif util.is_video(fullname) or util.has_extension(fullname, ['gif']):
+            videofiles.append(fullname)
             destination = util.get_destfilename_from_path(fullname, roop.globals.output_path, f'__temp.{roop.globals.CFG.output_video_format}')
-            f.finalname = destination
-            videofiles.append(f)
+            videofinalnames.append(destination)
 
 
     if(len(imagefiles) > 0):
         update_status('Processing image(s)')
-        roop.globals.BATCH_IMAGE_CHAIN_PROCESSOR.run_batch_chain(imagefiles, imagefiles, roop.globals.execution_threads, processors, params_gen_func)
+        roop.globals.BATCH_IMAGE_CHAIN_PROCESSOR.run_batch_chain(imagefiles, imagefinalnames, roop.globals.execution_threads, processors, params_gen_func)
     if(len(videofiles) > 0):
         for index,v in enumerate(videofiles):
             if not roop.globals.processing:
                 end_processing('Processing stopped!')
                 return
-            fps = util.detect_fps(v.filename)
-            update_status(f'Creating {os.path.basename(v.finalname)} with {fps} FPS...')
+
             start_processing = time()
+
+            fps = util.detect_fps(v)
+            update_status(f'Creating {os.path.basename(videofinalnames[index])} with {fps} FPS...')
             if roop.globals.keep_frames or not use_new_method:
-                util.create_temp(v.filename)
+                util.create_temp(v)
                 update_status('Extracting frames...')
-                util.extract_frames(v.filename,v.startframe,v.endframe, fps)
+                util.extract_frames(v)
                 if not roop.globals.processing:
                     end_processing('Processing stopped!')
                     return
 
-                temp_frame_paths = util.get_temp_frame_paths(v.filename)
+                temp_frame_paths = util.get_temp_frame_paths(v)
                 roop.globals.BATCH_IMAGE_CHAIN_PROCESSOR.run_batch_chain(temp_frame_paths, temp_frame_paths, roop.globals.execution_threads, processors, params_gen_func)
                 if not roop.globals.processing:
                     end_processing('Processing stopped!')
                     return
                 
-                util.create_video(v.filename, f.finalname, fps)
+                util.create_video(v, videofinalnames[index], fps)
                 if not roop.globals.keep_frames:
                     util.delete_temp_frames(temp_frame_paths[0])
             else:
-                process_mgr.run_batch_chain(v.filename, v.finalname, v.startframe, v.endframe, fps,
-                                                                    roop.globals.execution_threads, roop.globals.CFG.frame_buffer_size)
+                roop.globals.VIDEO_CHAIN_PROCESSOR.run_batch_chain(v, videofinalnames[index], fps,
+                                                                    roop.globals.execution_threads, roop.globals.CFG.frame_buffer_size,
+                                                                      processors, params_gen_func)
                 
             if not roop.globals.processing:
                 end_processing('Processing stopped!')
                 return
             
-            video_file_name = v.finalname
+            video_file_name = videofinalnames[index]
             if os.path.isfile(video_file_name):
                 destination = ''
-                if util.has_extension(v.filename, ['gif']):
-                    gifname = util.get_destfilename_from_path(v.filename, './output', '.gif')
+                if util.has_extension(v, ['gif']):
+                    gifname = util.get_destfilename_from_path(v, './output', '.gif')
                     destination = util.replace_template(gifname, index=index)
+
                     pathlib.Path(os.path.dirname(destination)).mkdir(parents=True, exist_ok=True)
 
                     update_status('Creating final GIF')
@@ -368,7 +383,7 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
                     pathlib.Path(os.path.dirname(destination)).mkdir(parents=True, exist_ok=True)
 
                     if not skip_audio:
-                        util.restore_audio(video_file_name, v.filename, v.startframe, v.endframe, destination)
+                        util.restore_audio(video_file_name, v, destination)
                         if os.path.isfile(destination):
                             os.remove(video_file_name)
                     else:
@@ -376,7 +391,7 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
                 update_status(f'\nProcessing {os.path.basename(destination)} took {time() - start_processing} secs')
 
             else:
-                update_status(f'Failed processing {os.path.basename(v.finalname)}!')
+                update_status(f'Failed processing {os.path.basename(video_file_name)}!')
             release_resources()
     end_processing('Finished')
 

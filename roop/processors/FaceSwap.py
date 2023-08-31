@@ -8,6 +8,7 @@ import roop.globals
 
 from insightface.utils.face_align import norm_crop2
 from numpy.linalg import norm as l2norm
+from roop.processors.frame.face_swapper import get_face_swapper
 
 from roop.typing import Face, Frame
 from roop.utilities import resolve_relative_path
@@ -23,6 +24,7 @@ class FaceSwapInsightFace():
     emap = []                      # comes from loading the inswapper model. not sure of data
 
     processorname = 'faceswap'
+    type = 'swap'
 
 
     def Initialize(self):
@@ -48,28 +50,30 @@ class FaceSwapInsightFace():
         
 
     def Run(self, source_face: Face, target_face: Face, temp_frame: Frame) -> Frame:
-        aimg, _ = norm_crop2(temp_frame, target_face.kps, self.input_size[0])
-        blob = cv2.dnn.blobFromImage(aimg, 1.0 / 255.0, self.input_size, (0.0, 0.0, 0.0), swapRB=True)
+        img_fake, M = get_face_swapper().get(temp_frame, target_face, source_face, paste_back=False)
+        return img_fake, M 
+        # aimg, _ = norm_crop2(temp_frame, target_face.kps, self.input_size[0])
+        # blob = cv2.dnn.blobFromImage(aimg, 1.0 / 255.0, self.input_size, (0.0, 0.0, 0.0), swapRB=True)
 
-        #Select source embedding
-        n_e = source_face.normed_embedding / l2norm(source_face.normed_embedding)
-        latent = n_e.reshape((1,-1))
-        latent = np.dot(latent, self.emap)
-        latent /= np.linalg.norm(latent)
+        # #Select source embedding
+        # n_e = source_face.normed_embedding / l2norm(source_face.normed_embedding)
+        # latent = n_e.reshape((1,-1))
+        # latent = np.dot(latent, self.emap)
+        # latent /= np.linalg.norm(latent)
 
                             
-        io_binding = self.model_swap_insightface.io_binding()
-        model_inputs = self.model_swap_insightface.get_inputs()
-        model_outputs = self.model_swap_insightface.get_outputs()            
-        io_binding.bind_cpu_input(model_inputs[0].name, blob)
-        io_binding.bind_cpu_input(model_inputs[1].name, latent)
-        io_binding.bind_output(model_outputs[0].name, "cuda")
-        self.model_swap_insightface.run_with_iobinding(io_binding)
-        ort_outs = io_binding.copy_outputs_to_cpu()
-        pred = ort_outs[0]
+        # io_binding = self.model_swap_insightface.io_binding()
+        # model_inputs = self.model_swap_insightface.get_inputs()
+        # model_outputs = self.model_swap_insightface.get_outputs()            
+        # io_binding.bind_cpu_input(model_inputs[0].name, blob)
+        # io_binding.bind_cpu_input(model_inputs[1].name, latent)
+        # io_binding.bind_output(model_outputs[0].name, "cuda")
+        # self.model_swap_insightface.run_with_iobinding(io_binding)
+        # ort_outs = io_binding.copy_outputs_to_cpu()
+        # pred = ort_outs[0]
 
-        img_fake = pred.transpose((0,2,3,1))[0]
-        return np.clip(255 * img_fake, 0, 255).astype(np.uint8)[:,:,::-1]
+        # img_fake = pred.transpose((0,2,3,1))[0]
+        # return np.clip(255 * img_fake, 0, 255).astype(np.uint8)[:,:,::-1]
 
 
     def Release(self):
