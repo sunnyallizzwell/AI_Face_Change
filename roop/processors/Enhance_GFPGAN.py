@@ -15,15 +15,17 @@ class Enhance_GFPGAN():
 
     model_gfpgan = None
     name = None
+    devicename = None
 
     processorname = 'gfpgan'
     type = 'enhance'
 
 
-    def Initialize(self):
+    def Initialize(self, devicename):
         if self.model_gfpgan is None:
             model_path = resolve_relative_path('../models/GFPGANv1.4.onnx')
             self.model_gfpgan = onnxruntime.InferenceSession(model_path, None, providers=roop.globals.execution_providers)
+            self.devicename = devicename
 
         self.name = self.model_gfpgan.get_inputs()[0].name
 
@@ -39,7 +41,7 @@ class Enhance_GFPGAN():
 
         io_binding = self.model_gfpgan.io_binding()           
         io_binding.bind_cpu_input("input", temp_frame)
-        io_binding.bind_output("1288", "cuda")
+        io_binding.bind_output("1288", self.devicename)
         self.model_gfpgan.run_with_iobinding(io_binding)
         ort_outs = io_binding.copy_outputs_to_cpu()
         result = ort_outs[0][0]

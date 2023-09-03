@@ -22,18 +22,17 @@ class Mask_Clip2Seg():
     model_clip = None
 
     processorname = 'clip2seg'
+    type = 'mask'
 
 
-    def Initialize(self):
-        global model_clip
+    def Initialize(self, devicename):
+        if self.model_clip is None:
+            self.model_clip = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, complex_trans_conv=True)
+            self.model_clip.eval();
+            self.model_clip.load_state_dict(torch.load('models/CLIP/rd64-uni-refined.pth', map_location=torch.device('cpu')), strict=False)
 
-        if model_clip is None:
-            model_clip = CLIPDensePredT(version='ViT-B/16', reduce_dim=64, complex_trans_conv=True)
-            model_clip.eval();
-            model_clip.load_state_dict(torch.load('models/CLIP/rd64-uni-refined.pth', map_location=torch.device('cpu')), strict=False)
-
-        device = torch.device('cuda')
-        model_clip.to(device)
+        device = torch.device(devicename)
+        self.model_clip.to(device)
 
 
     def Run(self, img1, img2, keywords) -> Frame:
@@ -97,5 +96,5 @@ class Mask_Clip2Seg():
 
 
     def Release(self):
-        self.model_clin = None
+        self.model_clip = None
 

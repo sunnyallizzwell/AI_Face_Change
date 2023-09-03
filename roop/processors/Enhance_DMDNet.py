@@ -29,15 +29,16 @@ class Enhance_DMDNet():
     type = 'enhance'
 
 
-    def Initialize(self):
+    def Initialize(self, devicename):
         if self.model_dmdnet is None:
-            self.model_dmdnet = self.create('cuda')
+            self.model_dmdnet = self.create(devicename)
+            
 
-    def Run(self, source_face: Face, target_face: Face, temp_frame: Frame, M) -> Frame:
+    # temp_frame already cropped+aligned, bbox not
+    def Run(self, source_face: Face, target_face: Face, temp_frame: Frame) -> Frame:
         input_size = temp_frame.shape[1]
-        offsetx = int( input_size)       
 
-        result = self.enhance_face(source_face, temp_frame, target_face, M)
+        result = self.enhance_face(source_face, temp_frame, target_face)
         scale_factor = int(result.shape[1] / input_size)       
         return result.astype(np.uint8), scale_factor
 
@@ -79,29 +80,34 @@ class Enhance_DMDNet():
             i += 1
 
 
-    # clip: cutout face: face struct
-    def enhance_face(self, ref_face, temp_frame, face, M):
+    def trans_points2d(self, pts, M):
+        new_pts = np.zeros(shape=pts.shape, dtype=np.float32)
+        for i in range(pts.shape[0]):
+            pt = pts[i]
+            new_pt = np.array([pt[0], pt[1], 1.0], dtype=np.float32)
+            new_pt = np.dot(M, new_pt)
+            new_pts[i] = new_pt[0:2]
+
+        return new_pts
+
+
+    def enhance_face(self, ref_face, temp_frame, face):
         # preprocess
         start_x, start_y, end_x, end_y = map(int, face['bbox'])
+        width = end_x - start_x
+        height = end_y - start_y
+        
         
         lm106 = face.landmark_2d_106
         lq_landmarks = np.asarray(self.landmarks106_to_68(lm106))
 
-        sub = np.full_like(lq_landmarks, [start_x, start_y])
-        lq_landmarks = lq_landmarks - sub
-        lq_landmarks = np.where(lq_landmarks < 0, 0, lq_landmarks)
-
         if temp_frame.shape[0] != 512 or temp_frame.shape[1] != 512:
-            y_factor = (512 / temp_frame.shape[1]) * 1.0
-            x_factor = (512 / temp_frame.shape[0]) * 1.0
-            scale_factor = int(512 / temp_frame.shape[1])
+            # scale to 512x512
+            scale_factor = 512 / temp_frame.shape[1]
 
-            M_scale = M * scale_factor
-            IM = cv2.invertAffineTransform(M_scale)
-            # lq_landmarks = cv2.warpAffine(lq_landmarks, IM, (lq_landmarks.shape[1], lq_landmarks.shape[0]), flags=cv2.INTER_NEAREST, borderValue=0.0) 
+            M = face.matrix * scale_factor
 
-            mult = np.full_like(lq_landmarks, [x_factor, y_factor])
-            lq_landmarks = lq_landmarks * mult
+            lq_landmarks = self.trans_points2d(lq_landmarks, M)
             temp_frame = cv2.resize(temp_frame, (512,512), interpolation = cv2.INTER_AREA)
 
         if temp_frame.ndim == 2:
@@ -109,10 +115,10 @@ class Enhance_DMDNet():
         # else:
         #     temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_BGR2RGB)  # RGB
 
-        lq,lq_landmarks = read_img_tensor(temp_frame, lq_landmarks)
+        lq = read_img_tensor(temp_frame)
 
         LQLocs = get_component_location(lq_landmarks)
-        self.check_bbox(lq, LQLocs.unsqueeze(0))
+        # self.check_bbox(lq, LQLocs.unsqueeze(0))
 
         # specific
         # start_x, start_y, end_x, end_y = map(int, ref_face['bbox'])
@@ -147,7 +153,7 @@ class Enhance_DMDNet():
         with torch.no_grad():
             with THREAD_LOCK_DMDNET:
                 try:
-                    GenericResult, SpecificResult =self.model_dmdnet(lq = lq.to(self.torchdevice), loc = LQLocs.unsqueeze(0), sp_256 = SpMem256Para, sp_128 = SpMem128Para, sp_64 = SpMem64Para)
+                    GenericResult, SpecificResult = self.model_dmdnet(lq = lq.to(self.torchdevice), loc = LQLocs.unsqueeze(0), sp_256 = SpMem256Para, sp_128 = SpMem128Para, sp_64 = SpMem64Para)
                 except Exception as e:
                     print(f'Error {e} there may be something wrong with the detected component locations.')
                     return temp_frame
@@ -181,12 +187,12 @@ class Enhance_DMDNet():
 
 
 
-def read_img_tensor(Img=None, landmarks=None): #rgb -1~1 
+def read_img_tensor(Img=None): #rgb -1~1 
     Img = Img.transpose((2, 0, 1))/255.0
     Img = torch.from_numpy(Img).float()
     normalize(Img, [0.5,0.5,0.5], [0.5,0.5,0.5], inplace=True)
     ImgTensor = Img.unsqueeze(0)
-    return ImgTensor, landmarks
+    return ImgTensor
 
 
 def get_component_location(Landmarks, re_read=False):

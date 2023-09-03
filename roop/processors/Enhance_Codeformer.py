@@ -16,13 +16,15 @@ from roop.utilities import resolve_relative_path
 class Enhance_CodeFormer():
 
     model_codeformer = None
+    devicename = None
 
     processorname = 'codeformer'
     type = 'enhance'
 
 
-    def Initialize(self):
+    def Initialize(self, devicename):
         if self.model_codeformer is None:
+            self.devicename = devicename
             model_path = resolve_relative_path('../models/CodeFormer/CodeFormerv0.1.onnx')
             self.model_codeformer = onnxruntime.InferenceSession(model_path, None, providers=roop.globals.execution_providers)
 
