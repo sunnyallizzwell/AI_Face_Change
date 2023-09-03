@@ -13,7 +13,7 @@ from roop.processors.Enhance_DMDNet import Enhance_DMDNet
 from roop.ProcessOptions import ProcessOptions
 
 from roop.face_util import get_first_face, get_all_faces
-from roop.utilities import compute_cosine_distance
+from roop.utilities import compute_cosine_distance, get_device
 
 from typing import Any, List, Callable
 from roop.typing import Frame
@@ -62,19 +62,23 @@ class ProcessMgr():
         processornames = options.processors.split(",")
         prolist = []
 
+        devicename = get_device()
         if len(self.processors) < 1:
             for pn in processornames:
                 if pn == "faceswap":
                     p = FaceSwapInsightFace()
-                    p.Initialize()
+                    p.Initialize(devicename)
                     self.processors.append(p)
                 elif pn == "gfpgan":
                     p = Enhance_GFPGAN()
-                    p.Initialize()
+                    p.Initialize(devicename)
                     self.processors.append(p)
+                elif pn == "dmdnet":
+                    p = Enhance_DMDNet()
+                    p.Initialize(devicename)
                 elif pn == "codeformer":
                     p = Enhance_CodeFormer()
-                    p.Initialize()
+                    p.Initialize(devicename)
                     self.processors.append(p)
         else:
             for i in range(len(self.processors) -1, -1, -1):
@@ -87,16 +91,16 @@ class ProcessMgr():
                     p = None
                     if pn == "faceswap":
                         p = FaceSwapInsightFace()
-                        p.Initialize()
+                        p.Initialize(devicename)
                     elif pn == "gfpgan":
                         p = Enhance_GFPGAN()
-                        p.Initialize()
+                        p.Initialize(devicename)
                     elif pn == "codeformer":
                         p = Enhance_CodeFormer()
-                        p.Initialize()
+                        p.Initialize(devicename)
                     elif pn == "dmdnet":
                         p = Enhance_DMDNet()
-                        p.Initialize()
+                        p.Initialize(devicename)
                     if p is not None:
                         self.processors.insert(i, p)
                     
@@ -271,28 +275,30 @@ class ProcessMgr():
 
 
     def process_face(self,face_index, target_face, frame, mask_top=0):
+        enhanced_frame = None
         for p in self.processors:
             if p.type == 'swap':
-                fake_frame, M = p.Run(self.input_face_datas[face_index], target_face, frame)
+                fake_frame = p.Run(self.input_face_datas[face_index], target_face, frame)
                 scale_factor = 0.0
             else:
-                if p.processorname == 'dmdnet':
-                    fake_frame, scale_factor = p.Run(self.input_face_datas[face_index], target_face, fake_frame, M)
-                else:
-                    fake_frame, scale_factor = p.Run(self.input_face_datas[face_index], target_face, fake_frame)
+                enhanced_frame, scale_factor = p.Run(self.input_face_datas[face_index], target_face, fake_frame)
 
-        if scale_factor == 0.0:
-            upscale = 512
-            scale_factor = int(upscale / fake_frame.shape[1])
-            fake_frame = cv2.resize(fake_frame, (upscale, upscale), cv2.INTER_CUBIC)
+        upscale = 512
+        orig_width = fake_frame.shape[1]
+        fake_frame = cv2.resize(fake_frame, (upscale, upscale), cv2.INTER_CUBIC)
+        if enhanced_frame is None:
+            scale_factor = int(upscale / orig_width)
+            return self.paste_upscale(fake_frame, fake_frame, target_face.matrix, frame, scale_factor, mask_top)
+        else:
+            return self.paste_upscale(fake_frame, enhanced_frame, target_face.matrix, frame, scale_factor, mask_top)
 
-        return self.paste_upscale(fake_frame, M, frame, scale_factor, mask_top)
+
 
     # Paste back adapted from here
     # https://github.com/fAIseh00d/refacer/blob/main/refacer.py
     # which is revised insightface paste back code
 
-    def paste_upscale(self, upsk_face, M, target_img, scale_factor, mask_top):
+    def paste_upscale(self, fake_face, upsk_face, M, target_img, scale_factor, mask_top):
             M_scale = M * scale_factor
             IM = cv2.invertAffineTransform(M_scale)
 
@@ -331,7 +337,11 @@ class ProcessMgr():
             img_matte = np.minimum(face_matte, img_matte)
             img_matte = np.reshape(img_matte, [img_matte.shape[0],img_matte.shape[1],1]) 
             ##Transform upcaled face back to target_img
-            paste_face = cv2.warpAffine(upsk_face, IM, (target_img.shape[1], target_img.shape[0]), borderMode=cv2.BORDER_REPLICATE) 
+            paste_face = cv2.warpAffine(upsk_face, IM, (target_img.shape[1], target_img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
+            if upsk_face is not fake_face:
+                fake_face = cv2.warpAffine(fake_face, IM, (target_img.shape[1], target_img.shape[0]), borderMode=cv2.BORDER_REPLICATE)
+                paste_face = cv2.addWeighted(paste_face, self.options.blend_ratio, fake_face, 1.0 - self.options.blend_ratio, 0)
+ 
             ##Re-assemble image
             paste_face = img_matte * paste_face
             paste_face = paste_face + (1-img_matte) * target_img.astype(np.float32) 
@@ -339,85 +349,11 @@ class ProcessMgr():
 
 
 
-        # temp_frame = cv2.resize(temp_frame, (512, 512))
-
-        # ratio = 4.0
-        # diff_x = 8.0*ratio
-        # dst = self.insight_arcface_dst * ratio
-        # dst[:,0] += diff_x
-        # tform = trans.SimilarityTransform()
-        # tform.estimate(target_face.kps, dst)
-        # M1 = tform.params[0:2, :]
-        # IM = cv2.invertAffineTransform(M1)
-
-        # img_mask = np.full((temp_frame.shape[0],temp_frame.shape[1]), 0, dtype=np.float32)
-        # mask_border = 5
-        # # img_mask = cv2.rectangle(img_mask, (mask_border+int(self.mask_left), mask_border+int(self.mask_top)), 
-        # #                         (512 - mask_border-int(self.mask_right), 512-mask_border-int(self.mask_bottom)), (255, 255, 255), -1)    
-        # img_mask = cv2.rectangle(img_mask, (mask_border, mask_border+int(mask_top)), 
-        #                         (512 - mask_border, 512-mask_border), (255, 255, 255), -1)    
-        # img_mask = cv2.GaussianBlur(img_mask, (self.options.mask_blur_amount*2+1,self.options.mask_blur_amount*2+1), 0)    
-        # img_mask /= 255
-
-
-        # img_mask_0 = np.reshape(img_mask, [img_mask.shape[0],img_mask.shape[1],1])
-        # img_mask = cv2.warpAffine(img_mask, IM, (target_img.shape[1], target_img.shape[0]), borderValue=0.0)
-
-        # fake_merged = img_mask_0* temp_frame
-        
-        # img_mask = np.reshape(img_mask, [img_mask.shape[0],img_mask.shape[1],1])    
-        # fake_merged = cv2.warpAffine(fake_merged, IM, (target_img.shape[1], target_img.shape[0]), borderValue=0.0) 
-       
-        # bbox = target_face.bbox
-
-        # padding_size = 0.3
-        # padding_hor = (bbox[2]-bbox[0]) * padding_size
-        # padding_vert = (bbox[3]-bbox[1]) * padding_size
-        
-        # left = floor(bbox[0]-padding_hor)
-        # top = floor(bbox[1]-padding_vert)
-        # right = ceil(bbox[2]+padding_hor)
-        # bottom = ceil(bbox[3]+padding_vert)
-        # if left<0:
-        #     left=0
-        # if top<0: 
-        #     top=0
-        # if right>target_img.shape[1]:
-        #     right=target_img.shape[1]
-        # if bottom>target_img.shape[0]:
-        #     bottom=target_img.shape[0]
-        
-        # fake_merged = fake_merged[top:bottom, left:right, 0:3]
-        # target_img_a = target_img[top:bottom, left:right, 0:3]
-        # img_mask = img_mask[top:bottom, left:right, 0:1]
-
-        # fake_merged = fake_merged + (1-img_mask) * target_img_a.astype(np.float32)
-        
-
-        # smallest = min(fake_merged.shape[0], fake_merged.shape[1])
-        # mask_border = smallest // 12
-        # if mask_border > 4:
-        #     img_white = np.full((fake_merged.shape[0], fake_merged.shape[1]), 0, dtype=float)
-        #     img_white = cv2.rectangle(img_white, (mask_border, mask_border), 
-        #                             (img_white.shape[1] - mask_border, img_white.shape[0]-mask_border), (255, 255, 255), -1)    
-        #     img_mask = img_white
-        #     t1 = mask_border * 2
-        #     kernel = np.ones((t1, t1), np.uint8)
-        #     img_mask = cv2.erode(img_mask, kernel, iterations=2)
-        #     t1 = mask_border
-        #     kernel_size = (t1, t1)
-        #     blur_size = tuple(2 * j + 1 for j in kernel_size)
-        #     img_mask = cv2.GaussianBlur(img_mask, blur_size, 0)
-        #     img_mask /= 255
-        #     img_mask = np.reshape(img_mask, [img_mask.shape[0], img_mask.shape[1], 1])
-        #     fake_merged = img_mask * fake_merged + (1 - img_mask) * target_img_a
-        
-        # target_img[top:bottom, left:right, 0:3] = fake_merged
-        # return target_img.astype(np.uint8)    #BGR
-
-
     def unload_models():
         pass
 
-    def release_resources():
-        pass
+
+    def release_resources(self):
+        for p in self.processors:
+            p.Release()
+

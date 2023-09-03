@@ -239,8 +239,7 @@ def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0, mask_to
     if process_mgr is None:
         process_mgr = ProcessMgr()
     
-    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, 20, swap_mode, selected_index, mask_top)
-
+    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, swap_mode, selected_index, mask_top)
     process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)
     frame = process_mgr.process_frame(frame)
 
@@ -290,6 +289,11 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
     processors = get_processing_plugins(use_clip)
     release_resources()
     limit_resources()
+
+    # limit threads for some providers
+    max_threads = suggest_execution_threads()
+    if max_threads == 1:
+        roop.globals.execution_threads = 1
 
     clip_text = new_clip_text
 

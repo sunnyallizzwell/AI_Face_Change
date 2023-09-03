@@ -550,7 +550,9 @@ def on_preview_frame_changed(frame_num, files, fake_preview, enhancer, detection
     else:
         current_frame = get_image_frame(filename)
     if current_frame is None:
-        return None 
+        return None
+    
+    time.sleep(0.2)
 
     if not fake_preview or len(roop.globals.INPUT_FACES) < 1:
         return convert_to_gradio(current_frame)
