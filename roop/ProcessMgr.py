@@ -6,7 +6,7 @@ from math import floor, ceil
 from skimage import transform as trans
 
 from roop.ProcessEntry import ProcessEntry
-from roop.processors.FaceSwap import FaceSwapInsightFace
+from roop.processors.FaceSwapInsightFace import FaceSwapInsightFace
 from roop.processors.Enhance_GFPGAN import Enhance_GFPGAN
 from roop.processors.Enhance_Codeformer import Enhance_CodeFormer
 from roop.processors.Enhance_DMDNet import Enhance_DMDNet
@@ -19,9 +19,9 @@ from typing import Any, List, Callable
 from roop.typing import Frame
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from threading import Thread, Lock
-from queue import Queue, PriorityQueue
+from queue import Queue
 from tqdm import tqdm
-from chain_img_processor.ffmpeg_writer import FFMPEG_VideoWriter # ffmpeg install needed
+from chain_img_processor.ffmpeg_writer import FFMPEG_VideoWriter
 import roop.globals
 
 
@@ -36,13 +36,13 @@ class ProcessMgr():
     current_index = 0
     processing_threads = 1
     buffer_wait_time = 0.1
-    loadbuffersize = 0 
 
     lock = Lock()
 
     frames_queue = None
     processed_queue = None
 
+    
 
     # 5-point template constant for face alignment - don't ask
     insight_arcface_dst = np.array(
@@ -50,9 +50,28 @@ class ProcessMgr():
             [41.5493, 92.3655], [70.7299, 92.2041]],
             dtype=np.float32)  
 
+    plugins =  { 
+    'faceswap' : 'FaceSwapInsightFace',
+    'codeformer' : 'Enhance_Codeformer',
+    'gfpgan' : 'Enhance_GFPGAN',
+    'dmdnet' : 'Enhance_DMDNet',
+    }
 
     def __init__(self):
         pass
+
+    def str_to_class(self, module_name, class_name):
+        from importlib import import_module
+        try:
+            module_ = import_module(module_name)
+            try:
+                class_ = getattr(module_, class_name)()
+            except AttributeError:
+                print('Class does not exist')
+        except ImportError:
+            print('Module does not exist')
+        return class_ or None
+        
 
     def initialize(self, input_faces, target_faces, options):
         self.input_face_datas = input_faces
@@ -65,21 +84,11 @@ class ProcessMgr():
         devicename = get_device()
         if len(self.processors) < 1:
             for pn in processornames:
-                if pn == "faceswap":
-                    p = FaceSwapInsightFace()
-                    p.Initialize(devicename)
-                    self.processors.append(p)
-                elif pn == "gfpgan":
-                    p = Enhance_GFPGAN()
-                    p.Initialize(devicename)
-                    self.processors.append(p)
-                elif pn == "dmdnet":
-                    p = Enhance_DMDNet()
-                    p.Initialize(devicename)
-                elif pn == "codeformer":
-                    p = Enhance_CodeFormer()
-                    p.Initialize(devicename)
-                    self.processors.append(p)
+                classname = self.plugins[pn]
+                module = 'roop.processors.' + classname
+                p = self.str_to_class(module, classname)
+                p.Initialize(devicename)
+                self.processors.append(p)
         else:
             for i in range(len(self.processors) -1, -1, -1):
                 if not self.processors[i].processorname in processornames:
@@ -89,18 +98,10 @@ class ProcessMgr():
             for i,pn in enumerate(processornames):
                 if i >= len(self.processors) or self.processors[i].processorname != pn:
                     p = None
-                    if pn == "faceswap":
-                        p = FaceSwapInsightFace()
-                        p.Initialize(devicename)
-                    elif pn == "gfpgan":
-                        p = Enhance_GFPGAN()
-                        p.Initialize(devicename)
-                    elif pn == "codeformer":
-                        p = Enhance_CodeFormer()
-                        p.Initialize(devicename)
-                    elif pn == "dmdnet":
-                        p = Enhance_DMDNet()
-                        p.Initialize(devicename)
+                    classname = self.plugins[pn]
+                    module = 'roop.processors.' + classname
+                    p = self.str_to_class(module, classname)
+                    p.Initialize(devicename)
                     if p is not None:
                         self.processors.insert(i, p)
                     
@@ -146,28 +147,16 @@ class ProcessMgr():
         with FFMPEG_VideoWriter(target_video, (width, height), fps, codec=roop.globals.video_encoder, crf=roop.globals.video_quality, audiofile=None) as output_video_ff:
             nextindex = 0
             num_producers = self.num_threads
-            order_buffer = PriorityQueue()
             
             while True and roop.globals.processing:
-                while not order_buffer.empty():
-                    frametuple = order_buffer.get_nowait()
-                    index, frame = frametuple
-                    if index == nextindex:
-                        output_video_ff.write_frame(frame)
-                        del frame
-                        del frametuple
-                        nextindex += 1
-                    else:
-                        order_buffer.put(frametuple)
-                        break
-
                 frametuple = self.processed_queue.get()
                 if frametuple is not None:
                     index, frame = frametuple
                     if index != nextindex:
-                        order_buffer.put(frametuple)
+                        self.processed_queue.put(frametuple)
                     else:
                         output_video_ff.write_frame(frame)
+                        del frame
                         nextindex += 1
                 else:
                     num_producers -= 1
@@ -187,11 +176,12 @@ class ProcessMgr():
         total = frame_count
         self.num_threads = threads
 
+        print(f'Detected {os.cpu_count()} CPU Cores')
+
         if buffersize < 1:
             buffersize = 1
-        self.loadbuffersize = buffersize
         self.processing_threads = self.num_threads
-        self.frames_queue = Queue(buffersize * self.num_threads)
+        self.frames_queue = Queue(buffersize)
         self.processed_queue = Queue()
 
         readthread = Thread(target=self.read_frames_thread, args=(cap, frame_start, frame_end, threads))
@@ -214,6 +204,9 @@ class ProcessMgr():
         readthread.join()
         writethread.join()
         cap.release()
+        self.frames_queue.queue.clear()
+        self.processed_queue.queue.clear()
+        
 
 
 
