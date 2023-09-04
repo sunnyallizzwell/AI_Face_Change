@@ -143,6 +143,11 @@ def limit_resources() -> None:
 
 def release_resources() -> None:
     import gc
+    global process_mgr
+
+    if process_mgr is not None:
+        process_mgr.release_resources()
+        process_mgr = None
 
     gc.collect()
     if 'CUDAExecutionProvider' in roop.globals.execution_providers and torch.cuda.is_available():
@@ -317,6 +322,12 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
             f.finalname = destination
             videofiles.append(f)
 
+
+    if process_mgr is None:
+        process_mgr = ProcessMgr()
+    
+    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, roop.globals.face_swap_mode, 0, 0)
+    process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)
 
     if(len(imagefiles) > 0):
         update_status('Processing image(s)')

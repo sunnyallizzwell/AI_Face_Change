@@ -30,6 +30,7 @@ class FaceSwapInsightFace():
 
 
     def Release(self):
+        del self.model_swap_insightface
         self.model_swap_insightface = None
 
 
