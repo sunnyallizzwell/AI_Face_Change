@@ -2,27 +2,35 @@ import os
 import cv2 
 import numpy as np
 import psutil
-from math import floor, ceil
-from skimage import transform as trans
 
-from roop.ProcessEntry import ProcessEntry
-from roop.processors.FaceSwapInsightFace import FaceSwapInsightFace
-from roop.processors.Enhance_GFPGAN import Enhance_GFPGAN
-from roop.processors.Enhance_Codeformer import Enhance_CodeFormer
-from roop.processors.Enhance_DMDNet import Enhance_DMDNet
 from roop.ProcessOptions import ProcessOptions
 
 from roop.face_util import get_first_face, get_all_faces
-from roop.utilities import compute_cosine_distance, get_device
+from roop.utilities import compute_cosine_distance, get_device, str_to_class
 
 from typing import Any, List, Callable
 from roop.typing import Frame
-from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread, Lock
 from queue import Queue
 from tqdm import tqdm
 from chain_img_processor.ffmpeg_writer import FFMPEG_VideoWriter
 import roop.globals
+
+
+def create_queue(temp_frame_paths: List[str]) -> Queue[str]:
+    queue: Queue[str] = Queue()
+    for frame_path in temp_frame_paths:
+        queue.put(frame_path)
+    return queue
+
+
+def pick_queue(queue: Queue[str], queue_per_future: int) -> List[str]:
+    queues = []
+    for _ in range(queue_per_future):
+        if not queue.empty():
+            queues.append(queue.get())
+    return queues
 
 
 class ProcessMgr():
@@ -52,7 +60,7 @@ class ProcessMgr():
 
     plugins =  { 
     'faceswap' : 'FaceSwapInsightFace',
-    'codeformer' : 'Enhance_Codeformer',
+    'codeformer' : 'Enhance_CodeFormer',
     'gfpgan' : 'Enhance_GFPGAN',
     'dmdnet' : 'Enhance_DMDNet',
     }
@@ -60,18 +68,6 @@ class ProcessMgr():
     def __init__(self):
         pass
 
-    def str_to_class(self, module_name, class_name):
-        from importlib import import_module
-        try:
-            module_ = import_module(module_name)
-            try:
-                class_ = getattr(module_, class_name)()
-            except AttributeError:
-                print('Class does not exist')
-        except ImportError:
-            print('Module does not exist')
-        return class_ or None
-        
 
     def initialize(self, input_faces, target_faces, options):
         self.input_face_datas = input_faces
@@ -79,14 +75,12 @@ class ProcessMgr():
         self.options = options
 
         processornames = options.processors.split(",")
-        prolist = []
-
         devicename = get_device()
         if len(self.processors) < 1:
             for pn in processornames:
                 classname = self.plugins[pn]
                 module = 'roop.processors.' + classname
-                p = self.str_to_class(module, classname)
+                p = str_to_class(module, classname)
                 p.Initialize(devicename)
                 self.processors.append(p)
         else:
@@ -100,11 +94,44 @@ class ProcessMgr():
                     p = None
                     classname = self.plugins[pn]
                     module = 'roop.processors.' + classname
-                    p = self.str_to_class(module, classname)
+                    p = str_to_class(module, classname)
                     p.Initialize(devicename)
                     if p is not None:
                         self.processors.insert(i, p)
-                    
+
+
+
+    def run_batch(self, source_files, target_files, threads:int = 1):
+        progress_bar_format = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]'
+        total = len(source_files)
+        self.num_threads = threads
+        with tqdm(total=total, desc='Processing', unit='frame', dynamic_ncols=True, bar_format=progress_bar_format) as progress:
+            with ThreadPoolExecutor(max_workers=threads) as executor:
+                futures = []
+                queue = create_queue(source_files)
+                queue_per_future = max(len(source_files) // threads, 1)
+                while not queue.empty():
+                    future = executor.submit(self.process_frames, source_files, target_files, pick_queue(queue, queue_per_future), lambda: self.update_progress(progress))
+                    futures.append(future)
+                for future in as_completed(futures):
+                    future.result()
+
+
+    def process_frames(self, source_files: List[str], target_files: List[str], current_files, update: Callable[[], None]) -> None:
+        for f in current_files:
+            if not roop.globals.processing:
+                return
+            
+            temp_frame = cv2.imread(f)
+            if temp_frame is not None:
+                resimg = self.process_frame(temp_frame)
+                if resimg is not None:
+                    i = source_files.index(f)
+                    cv2.imwrite(target_files[i], resimg)
+            if update:
+                update()
+
+
 
     def read_frames_thread(self, cap, frame_start, frame_end, num_threads):
         num_frame = 0
@@ -127,7 +154,7 @@ class ProcessMgr():
 
 
 
-    def process_frames(self, threadindex, progress) -> None:
+    def process_videoframes(self, threadindex, progress) -> None:
         while True:
             frame = self.frames_queue[threadindex].get()
             if frame is None:
@@ -159,7 +186,7 @@ class ProcessMgr():
             
 
 
-    def run_batch_chain(self, source_video, target_video, frame_start, frame_end, fps, threads:int = 1, buffersize=32):
+    def run_batch_inmem(self, source_video, target_video, frame_start, frame_end, fps, threads:int = 1, buffersize=32):
         cap = cv2.VideoCapture(source_video)
         # frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         frame_count = (frame_end - frame_start) + 1
@@ -192,7 +219,7 @@ class ProcessMgr():
                 futures = []
                 
                 for threadindex in range(threads):
-                    future = executor.submit(self.process_frames, threadindex, lambda: self.update_progress(progress))
+                    future = executor.submit(self.process_videoframes, threadindex, lambda: self.update_progress(progress))
                     futures.append(future)
                 
                 for future in as_completed(futures):
@@ -217,11 +244,9 @@ class ProcessMgr():
         progress.update(1)
 
 
-    def process(entry: ProcessEntry=None):
-        pass
-        
+       
 
-    def process_frame(self, frame):
+    def process_frame(self, frame:Frame):
         if len(self.input_face_datas) < 1:
             return frame
     
@@ -231,7 +256,7 @@ class ProcessMgr():
             face = get_first_face(frame)
             if face is None:
                 return frame
-            return self.process_face(self.options.selected_index, face, temp_frame, self.options.mask_top)
+            return self.process_face(self.options.selected_index, face, temp_frame)
 
         else:
             faces = get_all_faces(frame)
@@ -240,7 +265,7 @@ class ProcessMgr():
             
             if self.options.swap_mode == "all":
                 for face in faces:
-                    temp_frame = self.process_face(self.options.selected_index, face, temp_frame, self.options.mask_top)
+                    temp_frame = self.process_face(self.options.selected_index, face, temp_frame)
                     del face
                 return temp_frame
             
@@ -249,7 +274,7 @@ class ProcessMgr():
                     for face in faces:
                         if compute_cosine_distance(tf.embedding, face.embedding) <= self.options.face_distance_threshold:
                             if i < len(self.input_face_datas):
-                                temp_frame = self.process_face(i, face, temp_frame, self.options.mask_top)
+                                temp_frame = self.process_face(i, face, temp_frame)
                             break
                         del face
 
@@ -257,13 +282,13 @@ class ProcessMgr():
                 gender = 'F' if self.swap_mode == "all_female" else 'M'
                 for face in faces:
                     if face.sex == gender:
-                        temp_frame = self.process_face(self.options.selected_index, face, temp_frame,self.options.mask_top)
+                        temp_frame = self.process_face(self.options.selected_index, face, temp_frame)
                     del face
 
         return temp_frame
 
 
-    def process_face(self,face_index, target_face, frame, mask_top=0):
+    def process_face(self,face_index, target_face, frame:Frame):
         enhanced_frame = None
         for p in self.processors:
             if p.type == 'swap':
@@ -275,6 +300,7 @@ class ProcessMgr():
         upscale = 512
         orig_width = fake_frame.shape[1]
         fake_frame = cv2.resize(fake_frame, (upscale, upscale), cv2.INTER_CUBIC)
+        mask_top = self.input_face_datas[face_index].mask_top
         if enhanced_frame is None:
             scale_factor = int(upscale / orig_width)
             return self.paste_upscale(fake_frame, fake_frame, target_face.matrix, frame, scale_factor, mask_top)

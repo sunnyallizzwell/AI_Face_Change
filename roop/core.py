@@ -235,7 +235,7 @@ def get_processing_plugins(use_clip):
     return processors
 
 
-def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0, mask_top=0):
+def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0):
     global process_mgr
 
     if frame is None:
@@ -244,7 +244,7 @@ def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0, mask_to
     if process_mgr is None:
         process_mgr = ProcessMgr()
     
-    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, swap_mode, selected_index, mask_top)
+    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, swap_mode, selected_index)
     process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)
     frame = process_mgr.process_frame(frame)
 
@@ -326,12 +326,12 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
     if process_mgr is None:
         process_mgr = ProcessMgr()
     
-    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, roop.globals.face_swap_mode, 0, 0)
+    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, roop.globals.face_swap_mode, 0)
     process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)
 
     if(len(imagefiles) > 0):
         update_status('Processing image(s)')
-        roop.globals.BATCH_IMAGE_CHAIN_PROCESSOR.run_batch_chain(imagefiles, imagefiles, roop.globals.execution_threads, processors, params_gen_func)
+        process_mgr.run_batch(f.filename, f.finalname, roop.globals.execution_threads)
     if(len(videofiles) > 0):
         for index,v in enumerate(videofiles):
             if not roop.globals.processing:
@@ -349,7 +349,7 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
                     return
 
                 temp_frame_paths = util.get_temp_frame_paths(v.filename)
-                roop.globals.BATCH_IMAGE_CHAIN_PROCESSOR.run_batch_chain(temp_frame_paths, temp_frame_paths, roop.globals.execution_threads, processors, params_gen_func)
+                process_mgr.run_batch(temp_frame_paths, temp_frame_paths, roop.globals.execution_threads)
                 if not roop.globals.processing:
                     end_processing('Processing stopped!')
                     return
@@ -358,7 +358,7 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
                 if not roop.globals.keep_frames:
                     util.delete_temp_frames(temp_frame_paths[0])
             else:
-                process_mgr.run_batch_chain(v.filename, v.finalname, v.startframe, v.endframe, fps,
+                process_mgr.run_batch_inmem(v.filename, v.finalname, v.startframe, v.endframe, fps,
                                                                     roop.globals.execution_threads, roop.globals.CFG.frame_buffer_size)
                 
             if not roop.globals.processing:

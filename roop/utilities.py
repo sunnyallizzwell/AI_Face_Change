@@ -249,6 +249,19 @@ def get_device() -> str:
     return 'cpu'
     
 
+def str_to_class(module_name, class_name):
+    from importlib import import_module
+    try:
+        module_ = import_module(module_name)
+        try:
+            class_ = getattr(module_, class_name)()
+        except AttributeError:
+            print('Class does not exist')
+    except ImportError:
+        print('Module does not exist')
+    return class_ or None
+
+
 # Taken from https://stackoverflow.com/a/68842705
 def get_platform():
     if sys.platform == 'linux':
