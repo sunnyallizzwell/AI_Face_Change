@@ -10,6 +10,7 @@ import urllib
 import torch
 import gradio
 import tempfile
+import json
 
 from pathlib import Path
 from typing import List, Any
@@ -40,15 +41,19 @@ def run_ffmpeg(args: List[str]) -> bool:
     return False
 
 
-def detect_fps(target_path: str) -> float:
-    command = ['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=r_frame_rate', '-of', 'default=noprint_wrappers=1:nokey=1', target_path]
-    output = subprocess.check_output(command).decode().strip().split('/')
-    try:
-        numerator, denominator = map(int, output)
-        return numerator / denominator
-    except Exception:
-        pass
-    return 24.0
+# https://github.com/facefusion/facefusion/blob/master/facefusion
+def detect_fps(target_path : str) -> float:
+	commands = [ 'ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=r_frame_rate', '-of', 'json', target_path ]
+	output = subprocess.check_output(commands).decode().strip()
+	try:
+		entries = json.loads(output)
+		for stream in entries.get('streams'):
+			numerator, denominator = map(int, stream.get('r_frame_rate').split('/'))
+			return numerator / denominator
+		return None
+	except (ValueError, ZeroDivisionError):
+		return 24
+
 
 def cut_video(original_video: str, cut_video: str, start_frame: int, end_frame: int):
     fps = detect_fps(original_video)

@@ -8,8 +8,6 @@ from clip.clipseg import CLIPDensePredT
 from numpy import asarray
 from typing import Any, List, Callable
 import numpy as np
-import onnxruntime
-import roop.globals
 
 from roop.typing import Face, Frame
 from roop.utilities import resolve_relative_path
@@ -35,9 +33,10 @@ class Mask_Clip2Seg():
         self.model_clip.to(device)
 
 
-    def Run(self, img1, img2, keywords) -> Frame:
-        global model_clip
-
+    def Run(self, img1, img2, keywords:str) -> Frame:
+        if keywords is None or len(keywords) < 1:
+            return img1
+        
         source_image_small = cv2.resize(img1, (256,256))
         
         img_mask = np.full((source_image_small.shape[0],source_image_small.shape[1]), 0, dtype=np.float32)

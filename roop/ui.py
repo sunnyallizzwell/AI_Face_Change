@@ -111,10 +111,10 @@ def run():
                 with gr.Row():
                         mask_top = gr.Slider(0, 256, value=0, label="Offset Face Top", step=1.0, interactive=True)
                         with gr.Column():
-                            bt_remove_selected_input_face = gr.Button("Remove selected", size='sm')
-                            bt_clear_input_faces = gr.Button("Clear all", variant='stop', size='sm')
+                            bt_remove_selected_input_face = gr.Button("❌ Remove selected", size='sm')
+                            bt_clear_input_faces = gr.Button("💥 Clear all 💥", variant='stop', size='sm')
                         with gr.Column():
-                            bt_remove_selected_target_face = gr.Button("Remove selected", size='sm')
+                            bt_remove_selected_target_face = gr.Button("❌ Remove selected", size='sm')
                         with gr.Column():
                             bt_add_local = gr.Button('Add local files from', size='sm')
                             local_folder = gr.Textbox(show_label=False, placeholder="/content/", interactive=True)
@@ -125,7 +125,7 @@ def run():
                     with gr.Column(visible=False) as dynamic_face_selection:
                         face_selection = gr.Gallery(label="Detected faces", allow_preview=True, preview=True, height=256, object_fit="scale-down")
                         with gr.Row():
-                            bt_faceselect = gr.Button("Use selected face", size='sm')
+                            bt_faceselect = gr.Button("☑ Use selected face", size='sm')
                             bt_cancelfaceselect = gr.Button("Done", size='sm')
             
                 with gr.Row():
@@ -152,36 +152,37 @@ def run():
                                 clip_text = gr.Textbox(label="List of objects to mask and restore back on fake image", placeholder="cup,hands,hair,banana" ,elem_id='tooltip')
                                 gr.Dropdown(["Clip2Seg"], value="Clip2Seg", label="Engine")
                             with gr.Column(scale=1):
-                                bt_preview_mask = gr.Button("Show Mask Preview", variant='secondary')
+                                bt_preview_mask = gr.Button("👥 Show Mask Preview", variant='secondary')
                             with gr.Column(scale=2):
                                 maskpreview = gr.Image(label="Preview Mask", shape=(None,512), interactive=False)
                             
                 with gr.Row(variant='panel'):
                     with gr.Column():
-                        bt_start = gr.Button("Start", variant='primary')
+                        bt_start = gr.Button("▶ Start", variant='primary')
                     with gr.Column():
-                        bt_stop = gr.Button("Stop", variant='secondary')
+                        bt_stop = gr.Button("⏹ Stop", variant='secondary')
                     with gr.Column():
                         fake_preview = gr.Checkbox(label="Face swap frames", value=False)
                     with gr.Column():
-                        bt_refresh_preview = gr.Button("Refresh", variant='secondary')
+                        bt_refresh_preview = gr.Button("🔄 Refresh", variant='secondary')
                 with gr.Row(variant='panel'):
                     with gr.Column():
                         with gr.Accordion(label="Results", open=True):
-                            gr.Button("Open Output Folder", size='sm').click(fn=lambda: util.open_folder(util.resolve_relative_path('../output/')))
+                            gr.Button("👀 Open Output Folder", size='sm').click(fn=lambda: util.open_folder(util.resolve_relative_path('../output/')))
                             resultfiles = gr.Files(label='Processed File(s)', interactive=False)
                             resultimage = gr.Image(type='filepath', interactive=False, )
                     with gr.Column():
-                        with gr.Accordion(label="Preview Original/Fake Frame", open=True):
-                            previewimage = gr.Image(label="Preview Image", interactive=False)
                             with gr.Row(variant='panel'):
-                                with gr.Column():
-                                    preview_frame_num = gr.Slider(0, 0, value=0, label="Frame Number", step=1.0, interactive=True)
-                                    text_frame_clip = gr.Markdown('')
-                                with gr.Column():
-                                    bt_use_face_from_preview = gr.Button("Use Face from this Frame", variant='primary', size='sm')
-                                    set_frame_start = gr.Button("Set as Start", size='sm')
-                                    set_frame_end = gr.Button("Set as End", size='sm')
+                                    with gr.Column():
+                                        preview_frame_num = gr.Slider(0, 0, value=0, label="Frame Number", step=1.0, interactive=True)
+                                        text_frame_clip = gr.Markdown('')
+                                        forced_fps = gr.Slider(minimum=0, maximum=120, value=0, label="Force Video FPS",info='Override detected video fps - 0 = use detected', step=1.0, interactive=True)
+                                    with gr.Column():
+                                        bt_use_face_from_preview = gr.Button("Use Face from this Frame", variant='primary', size='sm')
+                                        set_frame_start = gr.Button("⬅ Set as Start", size='sm')
+                                        set_frame_end = gr.Button("➡ Set as End", size='sm')
+                            with gr.Row(variant='panel'):
+                                previewimage = gr.Image(label="Preview Image", interactive=False)
                                 
                         
             with gr.Tab("Live Cam"):
@@ -533,6 +534,7 @@ def on_selected_face():
     fd = SELECTION_FACES_DATA[SELECTED_FACE_INDEX]
     image = convert_to_gradio(fd[1])
     if IS_INPUT:
+        fd[0].mask_top = 0
         roop.globals.INPUT_FACES.append(fd[0])
         input_thumbs.append(image)
         return input_thumbs, gr.Gallery.update(visible=True), gr.Dropdown.update(visible=True)
@@ -720,7 +722,7 @@ def on_destfiles_changed(destfiles):
         return gr.Slider.update(value=0, maximum=0), ''
     
     for f in destfiles:
-        list_files_process.append(ProcessEntry(f.name, 0,0, 25))
+        list_files_process.append(ProcessEntry(f.name, 0,0, 0))
 
     selected_preview_index = 0
     idx = selected_preview_index    

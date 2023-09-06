@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread, Lock
 from queue import Queue
 from tqdm import tqdm
-from chain_img_processor.ffmpeg_writer import FFMPEG_VideoWriter
+from roop.ffmpeg_writer import FFMPEG_VideoWriter
 import roop.globals
 
 
@@ -59,10 +59,11 @@ class ProcessMgr():
             dtype=np.float32)  
 
     plugins =  { 
-    'faceswap' : 'FaceSwapInsightFace',
-    'codeformer' : 'Enhance_CodeFormer',
-    'gfpgan' : 'Enhance_GFPGAN',
-    'dmdnet' : 'Enhance_DMDNet',
+    'faceswap'      : 'FaceSwapInsightFace',
+    'mask_clip2seg' : 'Mask_Clip2Seg',
+    'codeformer'    : 'Enhance_CodeFormer',
+    'gfpgan'        : 'Enhance_GFPGAN',
+    'dmdnet'        : 'Enhance_DMDNet',
     }
 
     def __init__(self):
@@ -173,7 +174,7 @@ class ProcessMgr():
             nextindex = 0
             num_producers = self.num_threads
             
-            while True and roop.globals.processing:
+            while True:
                 frame = self.processed_queue[nextindex % self.num_threads].get()
                 nextindex += 1
                 if frame is not None:
@@ -294,6 +295,8 @@ class ProcessMgr():
             if p.type == 'swap':
                 fake_frame = p.Run(self.input_face_datas[face_index], target_face, frame)
                 scale_factor = 0.0
+            elif p.type == 'mask':
+                fake_frame = p.Run(frame, fake_frame, self.options.masking_text)
             else:
                 enhanced_frame, scale_factor = p.Run(self.input_face_datas[face_index], target_face, fake_frame)
 

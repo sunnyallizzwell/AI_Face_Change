@@ -25,7 +25,6 @@ import roop.utilities as util
 import roop.ui as ui
 from settings import Settings
 from roop.face_util import extract_face_images
-from chain_img_processor import ChainImgProcessor, ChainVideoProcessor, ChainBatchImageProcessor, ChainVideoImageProcessor
 from roop.ProcessEntry import ProcessEntry
 from roop.ProcessMgr import ProcessMgr
 from roop.ProcessOptions import ProcessOptions
@@ -163,19 +162,12 @@ def pre_check() -> bool:
     
     download_directory_path = util.resolve_relative_path('../models')
     util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/inswapper_128.onnx'])
-    # util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/GFPGANv1.4.pth'])
     util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/GFPGANv1.4.onnx'])
     util.conditional_download(download_directory_path, ['https://github.com/csxmli2016/DMDNet/releases/download/v1/DMDNet.pth'])
     download_directory_path = util.resolve_relative_path('../models/CLIP')
     util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/rd64-uni-refined.pth'])
     download_directory_path = util.resolve_relative_path('../models/CodeFormer')
     util.conditional_download(download_directory_path, ['https://huggingface.co/countfloyd/deepfake/resolve/main/CodeFormerv0.1.onnx'])
-    util.conditional_download(download_directory_path, ['https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/codeformer.pth'])
-    download_directory_path = util.resolve_relative_path('../models/CodeFormer/facelib')
-    util.conditional_download(download_directory_path, ['https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/detection_Resnet50_Final.pth'])
-    util.conditional_download(download_directory_path, ['https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/parsing_parsenet.pth'])
-    download_directory_path = util.resolve_relative_path('../models/CodeFormer/realesrgan')
-    util.conditional_download(download_directory_path, ['https://github.com/sczhou/CodeFormer/releases/download/v0.1.0/RealESRGAN_x2plus.pth'])
 
     if not shutil.which('ffmpeg'):
        update_status('ffmpeg is not installed.')
@@ -209,21 +201,10 @@ def start() -> None:
     batch_process(None, False, None)
 
 
-def InitPlugins():
-    if not roop.globals.IMAGE_CHAIN_PROCESSOR:
-        roop.globals.IMAGE_CHAIN_PROCESSOR = ChainImgProcessor()
-        roop.globals.BATCH_IMAGE_CHAIN_PROCESSOR = ChainBatchImageProcessor()
-        # roop.globals.VIDEO_CHAIN_PROCESSOR = ChainVideoProcessor()
-        roop.globals.VIDEO_CHAIN_PROCESSOR = ChainVideoImageProcessor()
-        roop.globals.IMAGE_CHAIN_PROCESSOR.init_with_plugins()
-        roop.globals.BATCH_IMAGE_CHAIN_PROCESSOR.init_with_plugins()
-        roop.globals.VIDEO_CHAIN_PROCESSOR.init_with_plugins()
-
-
 def get_processing_plugins(use_clip):
     processors = "faceswap"
     if use_clip:
-        processors += ",txt2clip"
+        processors += ",mask_clip2seg"
     
     if roop.globals.selected_enhancer == 'GFPGAN':
         processors += ",gfpgan"
@@ -231,7 +212,6 @@ def get_processing_plugins(use_clip):
         processors += ",codeformer"
     elif roop.globals.selected_enhancer == 'DMDNet':
         processors += ",dmdnet"
-    
     return processors
 
 
@@ -244,54 +224,29 @@ def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0):
     if process_mgr is None:
         process_mgr = ProcessMgr()
     
-    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, swap_mode, selected_index)
+    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, swap_mode, selected_index, clip_text)
     process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)
-    frame = process_mgr.process_frame(frame)
-
-    # InitPlugins()
-    # processors = get_processing_plugins(use_clip)
+    return process_mgr.process_frame(frame)
 
 
-    # temp_frame, _ = roop.globals.IMAGE_CHAIN_PROCESSOR.run_chain(frame,  
-    #                                                 {"swap_mode": swap_mode,
-    #                                                     "original_frame": frame,
-    #                                                     "blend_ratio": roop.globals.blend_ratio,
-    #                                                     "selected_index": selected_index,
-    #                                                     "face_distance_threshold": roop.globals.distance_threshold,
-    #                                                     "input_face_datas": roop.globals.INPUT_FACES, "target_face_datas": roop.globals.TARGET_FACES,
-    #                                                     "clip_prompt": clip_text},
-    #                                                     processors)
-    return frame
-    
 def preview_mask(frame, clip_text):
     import numpy as np
     
     maskimage = np.zeros((frame.shape), np.uint8)
-    processors = "txt2clip"
+    if process_mgr is None:
+        process_mgr = ProcessMgr()
+    options = ProcessOptions("mask_clip2seg", roop.globals.distance_threshold, roop.globals.blend_ratio, "None", 0, clip_text)
+    process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)
+    return process_mgr.process_frame(maskimage)
     
-    InitPlugins()
-
-    temp_frame, _ = roop.globals.IMAGE_CHAIN_PROCESSOR.run_chain(maskimage,  
-                                                    {"original_frame": frame, "clip_prompt": clip_text}, processors)
-    return temp_frame
 
 
 
-
-def params_gen_func(proc, frame):
-    global clip_text
-
-    return {"original_frame": frame, "blend_ratio": roop.globals.blend_ratio,
-             "swap_mode": roop.globals.face_swap_mode, "face_distance_threshold": roop.globals.distance_threshold, 
-             "input_face_datas": roop.globals.INPUT_FACES, "target_face_datas": roop.globals.TARGET_FACES,
-             "clip_prompt": clip_text}
 
 def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_method) -> None:
     global clip_text, process_mgr
 
     roop.globals.processing = True
-    InitPlugins()
-    processors = get_processing_plugins(use_clip)
     release_resources()
     limit_resources()
 
@@ -299,8 +254,6 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
     max_threads = suggest_execution_threads()
     if max_threads == 1:
         roop.globals.execution_threads = 1
-
-    clip_text = new_clip_text
 
     imagefiles:list[ProcessEntry] = []
     videofiles:list[ProcessEntry] = []
@@ -326,7 +279,7 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
     if process_mgr is None:
         process_mgr = ProcessMgr()
     
-    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, roop.globals.face_swap_mode, 0)
+    options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, roop.globals.face_swap_mode, 0, new_clip_text)
     process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)
 
     if(len(imagefiles) > 0):
