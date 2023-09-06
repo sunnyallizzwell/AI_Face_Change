@@ -14,19 +14,23 @@ from roop.utilities import resolve_relative_path
 
 
 class Enhance_CodeFormer():
-
     model_codeformer = None
     devicename = None
 
     processorname = 'codeformer'
     type = 'enhance'
-
+    
 
     def Initialize(self, devicename):
         if self.model_codeformer is None:
             self.devicename = devicename
             model_path = resolve_relative_path('../models/CodeFormer/CodeFormerv0.1.onnx')
             self.model_codeformer = onnxruntime.InferenceSession(model_path, None, providers=roop.globals.execution_providers)
+            self.model_inputs = self.model_codeformer.get_inputs()
+            model_outputs = self.model_codeformer.get_outputs()
+            self.io_binding = self.model_codeformer.io_binding()           
+            self.io_binding.bind_cpu_input(self.model_inputs[1].name, np.array([0.5]))
+            self.io_binding.bind_output(model_outputs[0].name, "cuda")
 
 
     def Run(self, source_face: Face, target_face: Face, temp_frame: Frame) -> Frame:
@@ -37,18 +41,13 @@ class Enhance_CodeFormer():
         temp_frame = temp_frame.astype('float32') / 255.0
         temp_frame = (temp_frame - 0.5) / 0.5
         temp_frame = np.expand_dims(temp_frame, axis=0).transpose(0, 3, 1, 2)
-
-
-        model_inputs = self.model_codeformer.get_inputs()
-        model_outputs = self.model_codeformer.get_outputs()
-        io_binding = self.model_codeformer.io_binding()           
-        io_binding.bind_cpu_input(model_inputs[0].name, temp_frame.astype(np.float32))
-        io_binding.bind_cpu_input(model_inputs[1].name, np.array([0.5]))
-        io_binding.bind_output(model_outputs[0].name, "cpu")
-        self.model_codeformer.run_with_iobinding(io_binding)
-        ort_outs = io_binding.copy_outputs_to_cpu()
+        
+        self.io_binding.bind_cpu_input(self.model_inputs[0].name, temp_frame.astype(np.float32))
+        self.model_codeformer.run_with_iobinding(self.io_binding)
+        ort_outs = self.io_binding.copy_outputs_to_cpu()
         result = ort_outs[0][0]
-
+        del ort_outs
+        
         # post-process
         result = result.transpose((1, 2, 0))
 
@@ -65,12 +64,3 @@ class Enhance_CodeFormer():
 
     def Release(self):
         self.model_codeformer = None
-
-
-
-
-
-
-
-
-
