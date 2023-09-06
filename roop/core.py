@@ -151,9 +151,9 @@ def update_status(message: str, scope: str = 'ROOP.CORE') -> None:
 def start() -> None:
     if roop.globals.headless:
         faces = extract_face_images(roop.globals.source_path,  (False, 0))
-        roop.globals.SELECTED_FACE_DATA_INPUT = faces[roop.globals.source_face_index]
+        roop.globals.SELECTED_FACE_DATA_INPUT = faces[roop.globals.source_face_index][0]
         faces = extract_face_images(roop.globals.target_path,  (False, has_image_extension(roop.globals.target_path)))
-        roop.globals.SELECTED_FACE_DATA_OUTPUT = faces[roop.globals.target_face_index]
+        roop.globals.SELECTED_FACE_DATA_OUTPUT = faces[roop.globals.target_face_index][0]
         if 'face_enhancer' in roop.globals.frame_processors:
             roop.globals.selected_enhancer = 'GFPGAN'
 
