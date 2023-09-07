@@ -231,13 +231,14 @@ def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0):
 
 def preview_mask(frame, clip_text):
     import numpy as np
+    global process_mgr
     
     maskimage = np.zeros((frame.shape), np.uint8)
     if process_mgr is None:
         process_mgr = ProcessMgr()
     options = ProcessOptions("mask_clip2seg", roop.globals.distance_threshold, roop.globals.blend_ratio, "None", 0, clip_text)
     process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)
-    return process_mgr.process_frame(maskimage)
+    return process_mgr.process_mask(frame, maskimage)
     
 
 

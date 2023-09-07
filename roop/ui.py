@@ -99,37 +99,42 @@ def run():
             server_port = None
         ssl_verify = False if server_name == '0.0.0.0' else True
         with gr.Blocks(title=f'{roop.metadata.name} {roop.metadata.version}', theme=roop.globals.CFG.selected_theme, css=mycss) as ui:
-            with gr.Row(variant='panel'):
+            with gr.Row(variant='compact'):
                     gr.Markdown(f"### [{roop.metadata.name} {roop.metadata.version}](https://github.com/C0untFloyd/roop-unleashed)")
                     gr.HTML(util.create_version_html(), elem_id="versions")
-            with gr.Tab("Face Swap"):
-                with gr.Row():
-                    with gr.Column():
+            with gr.Tab("🎭 Face Swap"):
+                with gr.Row(variant='panel'):
+                    with gr.Column(scale=2):
                         with gr.Row():
                             with gr.Column(min_width=160):
                                 input_faces = gr.Gallery(label="Input faces", allow_preview=True, preview=True, height=128, object_fit="scale-down")
                                 mask_top = gr.Slider(0, 256, value=0, label="Offset Face Top", step=1.0, interactive=True)
                                 bt_remove_selected_input_face = gr.Button("❌ Remove selected", size='sm')
                                 bt_clear_input_faces = gr.Button("💥 Clear all", variant='stop', size='sm')
-                                bt_srcimg = gr.Image(label='Source Face Image', type='filepath', tool=None)
                             with gr.Column(min_width=160):
                                 target_faces = gr.Gallery(label="Target faces", allow_preview=True, preview=True, height=128, object_fit="scale-down")
                                 bt_remove_selected_target_face = gr.Button("❌ Remove selected", size='sm')
                                 bt_add_local = gr.Button('Add local files from', size='sm')
                                 local_folder = gr.Textbox(show_label=False, placeholder="/content/", interactive=True)
-                                bt_destfiles = gr.Files(label='Target File(s)', file_count="multiple", elem_id='filelist')
+                        with gr.Row(variant='panel'):
+                            bt_srcimg = gr.Image(label='Source Face Image', type='filepath', tool=None, height=233)
+                            bt_destfiles = gr.Files(label='Target File(s)', file_count="multiple", elem_id='filelist', height=233)
+                        with gr.Row(variant='panel'):
+                            gr.Markdown('')
+                            forced_fps = gr.Slider(minimum=0, maximum=120, value=0, label="Video FPS", info='Overrides detected fps if not 0', step=1.0, interactive=True, container=True)
+    
                     with gr.Column(scale=2):
-                        previewimage = gr.Image(label="Preview Image", width=640, height=480, interactive=False)
-                    with gr.Column(min_width=80):
-                        fake_preview = gr.Checkbox(label="Face swap frames", value=False)
-                        preview_frame_num = gr.Slider(0, 0, value=0, label="Frame Number", step=1.0, interactive=True)
-                        text_frame_clip = gr.Markdown('')
-                        bt_refresh_preview = gr.Button("🔄 Refresh", variant='secondary')
-                        bt_use_face_from_preview = gr.Button("Use Face from this Frame", variant='primary', size='sm')
-                        set_frame_start = gr.Button("⬅ Set as Start", size='sm')
-                        set_frame_end = gr.Button("➡ Set as End", size='sm')
-                        forced_fps = gr.Slider(minimum=0, maximum=120, value=0, label="Force Video FPS to",info='Overrides detected video fps if value is not 0', step=1.0, interactive=True)
-                        chk_det_size = gr.Checkbox(label="Use default Det-Size", value=True, elem_id='default_det_size', interactive=True)
+                        previewimage = gr.Image(label="Preview Image", height=576, interactive=False)
+                        with gr.Row(variant='panel'):
+                                fake_preview = gr.Checkbox(label="Face swap frames", value=False)
+                                bt_refresh_preview = gr.Button("🔄 Refresh", variant='secondary', size='sm')
+                                bt_use_face_from_preview = gr.Button("Use Face from this Frame", variant='primary', size='sm')
+                        with gr.Row():
+                            preview_frame_num = gr.Slider(0, 0, value=0, label="Frame Number", step=1.0, interactive=True)
+                        with gr.Row():
+                            text_frame_clip = gr.Markdown('Processing frame range [0 - 0]')
+                            set_frame_start = gr.Button("⬅ Set as Start", size='sm')
+                            set_frame_end = gr.Button("➡ Set as End", size='sm')
                 with gr.Row(visible=False) as dynamic_face_selection:
                     with gr.Column(scale=2):
                         face_selection = gr.Gallery(label="Detected faces", allow_preview=True, preview=True, height=256, object_fit="scale-down")
@@ -139,7 +144,7 @@ def run():
                     with gr.Column():
                         gr.Markdown(' ') 
             
-                with gr.Row():
+                with gr.Row(variant='panel'):
                     with gr.Column(scale=1):
                         selected_face_detection = gr.Dropdown(["First found", "All faces", "Selected face", "All female", "All male"], value="First found", label="Select face selection for swapping")
                         max_face_distance = gr.Slider(0.01, 1.0, value=0.65, label="Max Face Similarity Threshold")
@@ -171,7 +176,7 @@ def run():
                         resultimage = gr.Image(type='filepath', label='Final Image', interactive=False, )
                                 
                         
-            with gr.Tab("Live Cam"):
+            with gr.Tab("🎥 Live Cam"):
                 with gr.Row():
                     with gr.Column(scale=2):
                         cam_toggle = gr.Checkbox(label='Activate', value=live_cam_active)
@@ -188,7 +193,7 @@ def run():
                             fake_cam_image = gr.Image(label='Fake Camera Output', interactive=False)
 
 
-            with gr.Tab("Extras"):
+            with gr.Tab("🎉 Extras"):
                 with gr.Row():
                     files_to_process = gr.Files(label='File(s) to process', file_count="multiple")
                 # with gr.Row(variant='panel'):
@@ -234,7 +239,7 @@ def run():
                     extra_files_output = gr.Files(label='Resulting output files', file_count="multiple")
                         
             
-            with gr.Tab("Settings"):
+            with gr.Tab("⚙ Settings"):
                 with gr.Row():
                     with gr.Column():
                         themes = gr.Dropdown(available_themes, label="Theme", info="Change needs complete restart", value=roop.globals.CFG.selected_theme)
@@ -249,6 +254,7 @@ def run():
                 with gr.Row():
                     with gr.Column():
                         settings_controls.append(gr.Dropdown(providerlist, label="Provider", value=roop.globals.CFG.provider, elem_id='provider', interactive=True))
+                        chk_det_size = gr.Checkbox(label="Use default Det-Size", value=True, elem_id='default_det_size', interactive=True)
                         settings_controls.append(gr.Checkbox(label="Force CPU for Face Analyser", value=roop.globals.CFG.force_cpu, elem_id='force_cpu', interactive=True))
                         max_threads = gr.Slider(1, 64, value=roop.globals.CFG.max_threads, label="Max. Number of Threads", info='default: 8', step=1.0, interactive=True)
                     with gr.Column():
@@ -586,7 +592,7 @@ def on_set_frame(sender:str, frame_num):
     
     idx = selected_preview_index
     if list_files_process[idx].endframe == 0:
-        return ''
+        return gen_processing_text(0,0)
     
     start = list_files_process[idx].startframe
     end = list_files_process[idx].endframe

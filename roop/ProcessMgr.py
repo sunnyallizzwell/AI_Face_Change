@@ -245,6 +245,7 @@ class ProcessMgr():
         progress.update(1)
 
 
+
        
 
     def process_frame(self, frame:Frame):
@@ -369,6 +370,12 @@ class ProcessMgr():
         del fake_face
         return paste_face.astype(np.uint8)
 
+
+    def process_mask(self, frame:Frame, mask:Frame):
+        for p in self.processors:
+            if p.type == 'mask':
+                return p.Run(frame, mask, self.options.masking_text)
+            
 
 
     def unload_models():
