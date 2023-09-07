@@ -105,56 +105,55 @@ def run():
             with gr.Tab("Face Swap"):
                 with gr.Row():
                     with gr.Column():
-                        input_faces = gr.Gallery(label="Input faces", allow_preview=True, preview=True, height=128, object_fit="scale-down")
-                    with gr.Column():
-                        target_faces = gr.Gallery(label="Target faces", allow_preview=True, preview=True, height=128, object_fit="scale-down")
-                with gr.Row():
-                        mask_top = gr.Slider(0, 256, value=0, label="Offset Face Top", step=1.0, interactive=True)
-                        with gr.Column():
-                            bt_remove_selected_input_face = gr.Button("❌ Remove selected", size='sm')
-                            bt_clear_input_faces = gr.Button("💥 Clear all 💥", variant='stop', size='sm')
-                        with gr.Column():
-                            bt_remove_selected_target_face = gr.Button("❌ Remove selected", size='sm')
-                        with gr.Column():
-                            bt_add_local = gr.Button('Add local files from', size='sm')
-                            local_folder = gr.Textbox(show_label=False, placeholder="/content/", interactive=True)
-                with gr.Row():
-                    bt_srcimg = gr.Image(label='Source Face Image', type='filepath', tool=None)
-                    bt_destfiles = gr.Files(label='Target File(s)', file_count="multiple", elem_id='filelist')                
-                with gr.Row():
-                    with gr.Column(visible=False) as dynamic_face_selection:
-                        face_selection = gr.Gallery(label="Detected faces", allow_preview=True, preview=True, height=256, object_fit="scale-down")
                         with gr.Row():
-                            bt_faceselect = gr.Button("☑ Use selected face", size='sm')
-                            bt_cancelfaceselect = gr.Button("Done", size='sm')
+                            with gr.Column(min_width=160):
+                                input_faces = gr.Gallery(label="Input faces", allow_preview=True, preview=True, height=128, object_fit="scale-down")
+                                mask_top = gr.Slider(0, 256, value=0, label="Offset Face Top", step=1.0, interactive=True)
+                                bt_remove_selected_input_face = gr.Button("❌ Remove selected", size='sm')
+                                bt_clear_input_faces = gr.Button("💥 Clear all", variant='stop', size='sm')
+                                bt_srcimg = gr.Image(label='Source Face Image', type='filepath', tool=None)
+                            with gr.Column(min_width=160):
+                                target_faces = gr.Gallery(label="Target faces", allow_preview=True, preview=True, height=128, object_fit="scale-down")
+                                bt_remove_selected_target_face = gr.Button("❌ Remove selected", size='sm')
+                                bt_add_local = gr.Button('Add local files from', size='sm')
+                                local_folder = gr.Textbox(show_label=False, placeholder="/content/", interactive=True)
+                                bt_destfiles = gr.Files(label='Target File(s)', file_count="multiple", elem_id='filelist')
+                    with gr.Column(scale=2):
+                        previewimage = gr.Image(label="Preview Image", width=640, height=480, interactive=False)
+                    with gr.Column(min_width=80):
+                        fake_preview = gr.Checkbox(label="Face swap frames", value=False)
+                        preview_frame_num = gr.Slider(0, 0, value=0, label="Frame Number", step=1.0, interactive=True)
+                        text_frame_clip = gr.Markdown('')
+                        bt_refresh_preview = gr.Button("🔄 Refresh", variant='secondary')
+                        bt_use_face_from_preview = gr.Button("Use Face from this Frame", variant='primary', size='sm')
+                        set_frame_start = gr.Button("⬅ Set as Start", size='sm')
+                        set_frame_end = gr.Button("➡ Set as End", size='sm')
+                        forced_fps = gr.Slider(minimum=0, maximum=120, value=0, label="Force Video FPS to",info='Overrides detected video fps if value is not 0', step=1.0, interactive=True)
+                        chk_det_size = gr.Checkbox(label="Use default Det-Size", value=True, elem_id='default_det_size', interactive=True)
+                with gr.Row(visible=False) as dynamic_face_selection:
+                    with gr.Column(scale=2):
+                        face_selection = gr.Gallery(label="Detected faces", allow_preview=True, preview=True, height=256, object_fit="scale-down")
+                    with gr.Column():
+                        bt_faceselect = gr.Button("☑ Use selected face", size='sm')
+                        bt_cancelfaceselect = gr.Button("Done", size='sm')
+                    with gr.Column():
+                        gr.Markdown(' ') 
             
                 with gr.Row():
                     with gr.Column(scale=1):
                         selected_face_detection = gr.Dropdown(["First found", "All faces", "Selected face", "All female", "All male"], value="First found", label="Select face selection for swapping")
                         max_face_distance = gr.Slider(0.01, 1.0, value=0.65, label="Max Face Similarity Threshold")
-                    with gr.Column(scale=1):
                         video_swapping_method = gr.Dropdown(["Extract Frames to media","In-Memory processing"], value="In-Memory", label="Select video processing method", interactive=True)
-                        chk_det_size = gr.Checkbox(label="Use default Det-Size", value=True, elem_id='default_det_size', interactive=True)
-                    with gr.Column(scale=2):
-                        roop.globals.keep_fps = gr.Checkbox(label="Keep FPS", value=True)
                         roop.globals.keep_frames = gr.Checkbox(label="Keep Frames (relevant only when extracting frames)", value=False)
                         roop.globals.skip_audio = gr.Checkbox(label="Skip audio", value=False)
-                with gr.Row():
-                    with gr.Column():
+                    with gr.Column(scale=1):
                         selected_enhancer = gr.Dropdown(["None", "Codeformer", "DMDNet", "GFPGAN"], value="None", label="Select post-processing")
-                    with gr.Column():
                         blend_ratio = gr.Slider(0.0, 1.0, value=0.65, label="Original/Enhanced image blend ratio")
-                with gr.Row():
-                    with gr.Accordion(label="Masking", open=False):
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                chk_useclip = gr.Checkbox(label="Use Text Masking", value=False)
-                                clip_text = gr.Textbox(label="List of objects to mask and restore back on fake image", placeholder="cup,hands,hair,banana" ,elem_id='tooltip')
-                                gr.Dropdown(["Clip2Seg"], value="Clip2Seg", label="Engine")
-                            with gr.Column(scale=1):
-                                bt_preview_mask = gr.Button("👥 Show Mask Preview", variant='secondary')
-                            with gr.Column(scale=2):
-                                maskpreview = gr.Image(label="Preview Mask", shape=(None,512), interactive=False)
+                    with gr.Column(scale=1):
+                        chk_useclip = gr.Checkbox(label="Use Text Masking", value=False)
+                        clip_text = gr.Textbox(label="List of objects to mask and restore back on fake image", placeholder="cup,hands,hair,banana" ,elem_id='tooltip')
+                        gr.Dropdown(["Clip2Seg"], value="Clip2Seg", label="Engine")
+                        bt_preview_mask = gr.Button("👥 Show Mask Preview", variant='secondary')
                             
                 with gr.Row(variant='panel'):
                     with gr.Column():
@@ -162,27 +161,14 @@ def run():
                     with gr.Column():
                         bt_stop = gr.Button("⏹ Stop", variant='secondary')
                     with gr.Column():
-                        fake_preview = gr.Checkbox(label="Face swap frames", value=False)
-                    with gr.Column():
-                        bt_refresh_preview = gr.Button("🔄 Refresh", variant='secondary')
+                        gr.Button("👀 Open Output Folder", size='sm').click(fn=lambda: util.open_folder(util.resolve_relative_path('../output/')))
+                    with gr.Column(scale=2):
+                        gr.Markdown(' ') 
                 with gr.Row(variant='panel'):
                     with gr.Column():
-                        with gr.Accordion(label="Results", open=True):
-                            gr.Button("👀 Open Output Folder", size='sm').click(fn=lambda: util.open_folder(util.resolve_relative_path('../output/')))
-                            resultfiles = gr.Files(label='Processed File(s)', interactive=False)
-                            resultimage = gr.Image(type='filepath', interactive=False, )
+                        resultfiles = gr.Files(label='Processed File(s)', interactive=False)
                     with gr.Column():
-                            with gr.Row(variant='panel'):
-                                    with gr.Column():
-                                        preview_frame_num = gr.Slider(0, 0, value=0, label="Frame Number", step=1.0, interactive=True)
-                                        text_frame_clip = gr.Markdown('')
-                                        forced_fps = gr.Slider(minimum=0, maximum=120, value=0, label="Force Video FPS",info='Override detected video fps - 0 = use detected', step=1.0, interactive=True)
-                                    with gr.Column():
-                                        bt_use_face_from_preview = gr.Button("Use Face from this Frame", variant='primary', size='sm')
-                                        set_frame_start = gr.Button("⬅ Set as Start", size='sm')
-                                        set_frame_end = gr.Button("➡ Set as End", size='sm')
-                            with gr.Row(variant='panel'):
-                                previewimage = gr.Image(label="Preview Image", interactive=False)
+                        resultimage = gr.Image(type='filepath', label='Final Image', interactive=False, )
                                 
                         
             with gr.Tab("Live Cam"):
@@ -305,10 +291,10 @@ def run():
             chk_det_size.select(fn=on_option_changed)
 
             bt_add_local.click(fn=on_add_local_folder, inputs=[local_folder], outputs=[bt_destfiles])
-            bt_preview_mask.click(fn=on_preview_mask, inputs=[preview_frame_num, bt_destfiles, clip_text], outputs=[maskpreview]) 
+            bt_preview_mask.click(fn=on_preview_mask, inputs=[preview_frame_num, bt_destfiles, clip_text], outputs=[previewimage]) 
 
             start_event = bt_start.click(fn=start_swap, 
-                inputs=[selected_enhancer, selected_face_detection, roop.globals.keep_fps, roop.globals.keep_frames,
+                inputs=[selected_enhancer, selected_face_detection, roop.globals.keep_frames,
                          roop.globals.skip_audio, max_face_distance, blend_ratio, chk_useclip, clip_text,video_swapping_method],
                 outputs=[bt_start, resultfiles, resultimage])
             
@@ -662,7 +648,7 @@ def translate_swap_mode(dropdown_text):
         
 
 
-def start_swap( enhancer, detection, keep_fps, keep_frames, skip_audio, face_distance, blend_ratio,
+def start_swap( enhancer, detection, keep_frames, skip_audio, face_distance, blend_ratio,
                 use_clip, clip_text, processing_method, progress=gr.Progress(track_tqdm=False)):
     from roop.core import batch_process
     global is_processing, list_files_process
@@ -680,7 +666,6 @@ def start_swap( enhancer, detection, keep_fps, keep_frames, skip_audio, face_dis
     roop.globals.target_path = None
     roop.globals.distance_threshold = face_distance
     roop.globals.blend_ratio = blend_ratio
-    roop.globals.keep_fps = keep_fps
     roop.globals.keep_frames = keep_frames
     roop.globals.skip_audio = skip_audio
     roop.globals.face_swap_mode = translate_swap_mode(detection)
