@@ -33,7 +33,7 @@ class Mask_Clip2Seg():
         self.model_clip.to(device)
 
 
-    def Run(self, img1, img2, keywords:str) -> Frame:
+    def Run(self, img1, keywords:str) -> Frame:
         if keywords is None or len(keywords) < 1:
             return img1
         
@@ -84,14 +84,8 @@ class Mask_Clip2Seg():
        
         img_mask *= clip_mask
         img_mask[img_mask<0.0] = 0.0
+        return img_mask
        
-        img_mask = cv2.resize(img_mask, (img2.shape[1], img2.shape[0]))
-        img_mask = np.reshape(img_mask, [img_mask.shape[0],img_mask.shape[1],1])
-       
-        target = img2.astype(np.float32)
-        result = (1-img_mask) * target
-        result += img_mask * img1.astype(np.float32)
-        return np.uint8(result)
 
 
     def Release(self):

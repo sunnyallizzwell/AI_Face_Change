@@ -262,7 +262,7 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
     update_status('Sorting videos/images')
 
 
-    for f in files:
+    for index, f in enumerate(files):
         fullname = f.filename
         if util.has_image_extension(fullname):
             destination = util.get_destfilename_from_path(fullname, roop.globals.output_path, f'.{roop.globals.CFG.output_image_format}')
@@ -285,13 +285,22 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
 
     if(len(imagefiles) > 0):
         update_status('Processing image(s)')
-        process_mgr.run_batch(f.filename, f.finalname, roop.globals.execution_threads)
+        origimages = []
+        fakeimages = []
+        for f in imagefiles:
+            origimages.append(f.filename)
+            fakeimages.append(f.finalname)
+
+        process_mgr.run_batch(origimages, fakeimages, roop.globals.execution_threads)
+        origimages.clear()
+        fakeimages.clear()
+
     if(len(videofiles) > 0):
         for index,v in enumerate(videofiles):
             if not roop.globals.processing:
                 end_processing('Processing stopped!')
                 return
-            fps = util.detect_fps(v.filename)
+            fps = v.fps if v.fps > 0 else util.detect_fps(v.filename)
             update_status(f'Creating {os.path.basename(v.finalname)} with {fps} FPS...')
             start_processing = time()
             if roop.globals.keep_frames or not use_new_method:
@@ -346,7 +355,6 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
 
             else:
                 update_status(f'Failed processing {os.path.basename(v.finalname)}!')
-            release_resources()
     end_processing('Finished')
 
 

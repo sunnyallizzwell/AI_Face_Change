@@ -138,7 +138,7 @@ class ProcessMgr():
         num_frame = 0
         total_num = frame_end - frame_start
         if frame_start > 0:
-                cap.set(cv2.CAP_PROP_POS_FRAMES,frame_start)
+            cap.set(cv2.CAP_PROP_POS_FRAMES,frame_start)
 
         while True and roop.globals.processing:
             ret, frame = cap.read()
@@ -164,8 +164,8 @@ class ProcessMgr():
                 return
             else:
                 resimg = self.process_frame(frame)
-                del frame
                 self.processed_queue[threadindex].put(resimg)
+                del frame
                 progress()
 
 
@@ -292,12 +292,15 @@ class ProcessMgr():
 
     def process_face(self,face_index, target_face, frame:Frame):
         enhanced_frame = None
+        img_mask = None
         for p in self.processors:
             if p.type == 'swap':
                 fake_frame = p.Run(self.input_face_datas[face_index], target_face, frame)
                 scale_factor = 0.0
             elif p.type == 'mask':
-                fake_frame = p.Run(frame, fake_frame, self.options.masking_text)
+                start_x, start_y, end_x, end_y = map(int, target_face['bbox'])
+                orig_frame = frame[start_y:end_y, start_x:end_x]
+                img_mask = p.Run(orig_frame, self.options.masking_text)
             else:
                 enhanced_frame, scale_factor = p.Run(self.input_face_datas[face_index], target_face, fake_frame)
 
@@ -307,12 +310,27 @@ class ProcessMgr():
         mask_top = self.input_face_datas[face_index].mask_top
         if enhanced_frame is None:
             scale_factor = int(upscale / orig_width)
-            return self.paste_upscale(fake_frame, fake_frame, target_face.matrix, frame, scale_factor, mask_top)
+            result = self.paste_upscale(fake_frame, fake_frame, target_face.matrix, frame, scale_factor, mask_top)
         else:
-            return self.paste_upscale(fake_frame, enhanced_frame, target_face.matrix, frame, scale_factor, mask_top)
+            result = self.paste_upscale(fake_frame, enhanced_frame, target_face.matrix, frame, scale_factor, mask_top)
+        if img_mask is not None:
+            target = result[start_y:end_y, start_x:end_x]
+            img_mask = cv2.resize(img_mask, (target.shape[1], target.shape[0]))
+            img_mask = np.reshape(img_mask, [img_mask.shape[0],img_mask.shape[1],1])
+    
+            target = target.astype(np.float32)
+            clip = (1-img_mask) * target
+            clip += img_mask * orig_frame.astype(np.float32)
+            result[start_y:end_y, start_x:end_x] = clip
+            return result
+
+        return result
+
+        
 
 
-
+    
+    
     # Paste back adapted from here
     # https://github.com/fAIseh00d/refacer/blob/main/refacer.py
     # which is revised insightface paste back code
@@ -371,10 +389,18 @@ class ProcessMgr():
         return paste_face.astype(np.uint8)
 
 
-    def process_mask(self, frame:Frame, mask:Frame):
+    def process_mask(self, frame:Frame, target:Frame):
         for p in self.processors:
             if p.type == 'mask':
-                return p.Run(frame, mask, self.options.masking_text)
+                img_mask = p.Run(frame, self.options.masking_text)
+                img_mask = cv2.resize(img_mask, (target.shape[1], target.shape[0]))
+                img_mask = np.reshape(img_mask, [img_mask.shape[0],img_mask.shape[1],1])
+       
+                target = target.astype(np.float32)
+                result = (1-img_mask) * target
+                result += img_mask * frame.astype(np.float32)
+                return np.uint8(result)
+
             
 
 

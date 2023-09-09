@@ -10,7 +10,7 @@ import urllib
 import torch
 import gradio
 import tempfile
-import json
+import cv2
 
 from pathlib import Path
 from typing import List, Any
@@ -43,16 +43,24 @@ def run_ffmpeg(args: List[str]) -> bool:
 
 # https://github.com/facefusion/facefusion/blob/master/facefusion
 def detect_fps(target_path : str) -> float:
-	commands = [ 'ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=r_frame_rate', '-of', 'json', target_path ]
-	output = subprocess.check_output(commands).decode().strip()
-	try:
-		entries = json.loads(output)
-		for stream in entries.get('streams'):
-			numerator, denominator = map(int, stream.get('r_frame_rate').split('/'))
-			return numerator / denominator
-		return None
-	except (ValueError, ZeroDivisionError):
-		return 24
+    fps = 24.0
+    cap = cv2.VideoCapture(target_path)
+    if cap.isOpened():
+        fps = cap.get(cv2.CAP_PROP_FPS)
+    cap.release()
+    return fps
+
+
+	# commands = [ 'ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=r_frame_rate', '-of', 'json', target_path ]
+	# output = subprocess.check_output(commands).decode().strip()
+	# try:
+	# 	entries = json.loads(output)
+	# 	for stream in entries.get('streams'):
+	# 		numerator, denominator = map(int, stream.get('r_frame_rate').split('/'))
+	# 		return numerator / denominator
+	# 	return None
+	# except (ValueError, ZeroDivisionError):
+	# 	return 24
 
 
 def cut_video(original_video: str, cut_video: str, start_frame: int, end_frame: int):
@@ -116,19 +124,16 @@ def restore_audio(intermediate_video: str, original_video: str, trim_frame_start
 	else:
 		if trim_frame_start is not None:
 			start_time = trim_frame_start / fps
-			commands.extend([ '-ss', str(start_time) ])
+			commands.extend([ '-ss', format(start_time, ".2f")])
 		else:
 			commands.extend([ '-ss', '0' ])
 		if trim_frame_end is not None:
 			end_time = trim_frame_end / fps
-			commands.extend([ '-to', str(end_time) ])
+			commands.extend([ '-to', format(end_time, ".2f")])
 		commands.extend([ '-c:a', 'aac' ])
 	commands.extend([ '-map', '0:v:0', '-map', '1:a:0', '-y', final_video ])
 	run_ffmpeg(commands)
 
-
-# def restore_audio(intermediate_video: str, original_video: str, final_video: str) -> None:
-#     run_ffmpeg(['-i', intermediate_video, '-i', original_video, '-c:v', 'copy', '-map', '0:v:0', '-map', '1:a:0', '-y', final_video])
 
 
 def get_temp_frame_paths(target_path: str) -> List[str]:

@@ -163,10 +163,9 @@ def run():
                 with gr.Row(variant='panel'):
                     with gr.Column():
                         bt_start = gr.Button("▶ Start", variant='primary')
+                        gr.Button("👀 Open Output Folder", size='sm').click(fn=lambda: util.open_folder(util.resolve_relative_path('../output/')))
                     with gr.Column():
                         bt_stop = gr.Button("⏹ Stop", variant='secondary')
-                    with gr.Column():
-                        gr.Button("👀 Open Output Folder", size='sm').click(fn=lambda: util.open_folder(util.resolve_relative_path('../output/')))
                     with gr.Column(scale=2):
                         gr.Markdown(' ') 
                 with gr.Row(variant='panel'):
@@ -277,14 +276,15 @@ def run():
             bt_remove_selected_input_face.click(fn=remove_selected_input_face, outputs=[input_faces])
             bt_srcimg.change(fn=on_srcimg_changed, show_progress='full', inputs=bt_srcimg, outputs=[dynamic_face_selection, face_selection, input_faces])
 
-            mask_top.input(fn=on_mask_top_changed, inputs=[mask_top])
+            mask_top.input(fn=on_mask_top_changed, inputs=[mask_top], show_progress='hidden')
 
 
             target_faces.select(on_select_target_face, None, None)
             bt_remove_selected_target_face.click(fn=remove_selected_target_face, outputs=[target_faces])
 
-            bt_destfiles.change(fn=on_destfiles_changed, inputs=[bt_destfiles], outputs=[preview_frame_num, text_frame_clip]).then(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top])
-            bt_destfiles.select(fn=on_destfiles_selected, outputs=[preview_frame_num, text_frame_clip]).then(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top])
+            forced_fps.change(fn=on_fps_changed, inputs=[forced_fps], show_progress='hidden')
+            bt_destfiles.change(fn=on_destfiles_changed, inputs=[bt_destfiles], outputs=[preview_frame_num, text_frame_clip], show_progress='hidden').then(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top], show_progress='hidden')
+            bt_destfiles.select(fn=on_destfiles_selected, outputs=[preview_frame_num, text_frame_clip, forced_fps], show_progress='hidden').then(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top], show_progress='hidden')
             bt_destfiles.clear(fn=on_clear_destfiles, outputs=[target_faces])
             resultfiles.select(fn=on_resultfiles_selected, inputs=[resultfiles], outputs=[resultimage])
 
@@ -302,7 +302,7 @@ def run():
             start_event = bt_start.click(fn=start_swap, 
                 inputs=[selected_enhancer, selected_face_detection, roop.globals.keep_frames,
                          roop.globals.skip_audio, max_face_distance, blend_ratio, chk_useclip, clip_text,video_swapping_method],
-                outputs=[bt_start, resultfiles, resultimage])
+                outputs=[bt_start, resultfiles]).then(fn=on_resultfiles_finished, inputs=[resultfiles], outputs=[resultimage])
             
             bt_stop.click(fn=stop_swap, cancels=[start_event])
             
@@ -660,7 +660,7 @@ def start_swap( enhancer, detection, keep_frames, skip_audio, face_distance, ble
     global is_processing, list_files_process
 
     if list_files_process is None or len(list_files_process) <= 0:
-        return gr.Button.update(variant="primary"), None, None
+        return gr.Button.update(variant="primary"), None
     
     if roop.globals.CFG.clear_output:
         shutil.rmtree(roop.globals.output_path)
@@ -681,10 +681,10 @@ def start_swap( enhancer, detection, keep_frames, skip_audio, face_distance, ble
     if roop.globals.face_swap_mode == 'selected':
         if len(roop.globals.TARGET_FACES) < 1:
             gr.Error('No Target Face selected!')
-            return gr.Button.update(variant="primary"),None, None
+            return gr.Button.update(variant="primary"), None
 
     is_processing = True            
-    yield gr.Button.update(variant="secondary"), None, None
+    yield gr.Button.update(variant="secondary"), None
     roop.globals.execution_threads = roop.globals.CFG.max_threads
     roop.globals.video_encoder = roop.globals.CFG.output_video_codec
     roop.globals.video_quality = roop.globals.CFG.video_quality
@@ -695,16 +695,24 @@ def start_swap( enhancer, detection, keep_frames, skip_audio, face_distance, ble
     outdir = pathlib.Path(roop.globals.output_path)
     outfiles = [item for item in outdir.iterdir() if item.is_file()]
     if len(outfiles) > 0:
-        yield gr.Button.update(variant="primary"),gr.Files.update(value=outfiles), gr.Image.update(value=outfiles[0])
+        yield gr.Button.update(variant="primary"),gr.Files.update(value=outfiles)
     else:
-        yield gr.Button.update(variant="primary"),None, None
+        yield gr.Button.update(variant="primary"),None
 
 
 def stop_swap():
     roop.globals.processing = False
     gr.Info('Aborting processing - please wait for the remaining threads to be stopped')
 
-   
+
+def on_fps_changed(fps):
+    global selected_preview_index, list_files_process
+
+    if len(list_files_process) < 1 or list_files_process[selected_preview_index].endframe < 1:
+        return
+    list_files_process[selected_preview_index].fps = fps
+
+
 def on_destfiles_changed(destfiles):
     global selected_preview_index, list_files_process
 
@@ -739,6 +747,7 @@ def on_destfiles_selected(evt: gr.SelectData):
         selected_preview_index = evt.index
     idx = selected_preview_index    
     filename = list_files_process[idx].filename
+    fps = list_files_process[idx].fps
     if util.is_video(filename) or filename.lower().endswith('gif'):
         total_frames = get_video_frame_total(filename)
         if list_files_process[idx].endframe == 0:
@@ -747,8 +756,8 @@ def on_destfiles_selected(evt: gr.SelectData):
         total_frames = 0
     
     if total_frames > 0:
-        return gr.Slider.update(value=list_files_process[idx].startframe, maximum=total_frames), gen_processing_text(list_files_process[idx].startframe,list_files_process[idx].endframe)
-    return gr.Slider.update(value=0, maximum=total_frames), ''
+        return gr.Slider.update(value=list_files_process[idx].startframe, maximum=total_frames), gen_processing_text(list_files_process[idx].startframe,list_files_process[idx].endframe), fps
+    return gr.Slider.update(value=0, maximum=total_frames), gen_processing_text(0,0), fps
     
     
     
@@ -761,6 +770,20 @@ def on_resultfiles_selected(evt: gr.SelectData, files):
     else:
         current_frame = get_image_frame(filename)
     return convert_to_gradio(current_frame)
+
+
+def on_resultfiles_finished(files):
+    selected_index = 0
+    if files is None or len(files) < 1:
+        return None
+    
+    filename = files[selected_index].name
+    if util.is_video(filename) or filename.lower().endswith('gif'):
+        current_frame = get_video_frame(filename, 0)
+    else:
+        current_frame = get_image_frame(filename)
+    return convert_to_gradio(current_frame)
+
 
     
         
