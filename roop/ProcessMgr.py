@@ -50,6 +50,8 @@ class ProcessMgr():
     frames_queue = None
     processed_queue = None
 
+    videowriter= None
+
     
 
     # 5-point template constant for face alignment - don't ask
@@ -169,21 +171,20 @@ class ProcessMgr():
                 progress()
 
 
-    def write_frames_thread(self, target_video, width, height, fps, total):
-        with FFMPEG_VideoWriter(target_video, (width, height), fps, codec=roop.globals.video_encoder, crf=roop.globals.video_quality, audiofile=None) as output_video_ff:
-            nextindex = 0
-            num_producers = self.num_threads
-            
-            while True:
-                frame = self.processed_queue[nextindex % self.num_threads].get()
-                nextindex += 1
-                if frame is not None:
-                    output_video_ff.write_frame(frame)
-                    del frame
-                else:
-                    num_producers -= 1
-                    if num_producers < 1:
-                        return
+    def write_frames_thread(self):
+        nextindex = 0
+        num_producers = self.num_threads
+        
+        while True:
+            frame = self.processed_queue[nextindex % self.num_threads].get()
+            nextindex += 1
+            if frame is not None:
+                self.videowriter.write_frame(frame)
+                del frame
+            else:
+                num_producers -= 1
+                if num_producers < 1:
+                    return
             
 
 
@@ -209,10 +210,21 @@ class ProcessMgr():
             self.frames_queue.append(Queue(1))
             self.processed_queue.append(Queue(1))
 
+        self.videowriter =  FFMPEG_VideoWriter(target_video, (width, height), fps, codec=roop.globals.video_encoder, crf=roop.globals.video_quality, audiofile=None)
+        if frame_start > 0:
+            print('Writing offset frames')
+            num_write = frame_start
+            cap.set(cv2.CAP_PROP_POS_FRAMES,frame_start)
+            ret, frame = cap.read()
+            fake_frame = self.process_frame(frame)
+            while num_write > 0:
+                self.videowriter.write_frame(fake_frame)
+                num_write -= 1           
+
         readthread = Thread(target=self.read_frames_thread, args=(cap, frame_start, frame_end, threads))
         readthread.start()
 
-        writethread = Thread(target=self.write_frames_thread, args=(target_video, width, height, fps, total))
+        writethread = Thread(target=self.write_frames_thread)
         writethread.start()
 
         with tqdm(total=total, desc='Processing', unit='frames', dynamic_ncols=True, bar_format=progress_bar_format) as progress:
@@ -229,8 +241,10 @@ class ProcessMgr():
         readthread.join()
         writethread.join()
         cap.release()
+        self.videowriter.close()
         self.frames_queue.clear()
         self.processed_queue.clear()
+
 
 
 

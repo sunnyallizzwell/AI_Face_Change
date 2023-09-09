@@ -155,7 +155,7 @@ class FFMPEG_VideoWriter:
             #    self.proc.stdin.write(img_array.tostring())
         except IOError as err:
             _, ffmpeg_error = self.proc.communicate()
-            error = (str(err) + ("\n\nMoviePy error: FFMPEG encountered "
+            error = (str(err) + ("\n\nroop unleashed error: FFMPEG encountered "
                                  "the following error while writing file %s:"
                                  "\n\n %s" % (self.filename, str(ffmpeg_error))))
 
@@ -215,39 +215,4 @@ class FFMPEG_VideoWriter:
 
 
 
-def ffmpeg_write_image(filename, image, logfile=False):
-    """ Writes an image (HxWx3 or HxWx4 numpy array) to a file, using
-        ffmpeg. """
-
-    if image.dtype != 'uint8':
-          image = image.astype("uint8")
-
-    cmd = [ FFMPEG_BINARY, '-y',
-           '-s', "%dx%d"%(image.shape[:2][::-1]),
-           "-f", 'rawvideo',
-           '-pix_fmt', "rgba" if (image.shape[2] == 4) else "rgb24",
-           '-i','-', filename]
-
-    if logfile:
-        log_file = open(filename + ".log", 'w+')
-    else:
-        log_file = sp.PIPE
-
-    popen_params = {"stdout": DEVNULL,
-                    "stderr": log_file,
-                    "stdin": sp.PIPE}
-
-    if os.name == "nt":
-        popen_params["creationflags"] = 0x08000000
-
-    proc = sp.Popen(cmd, **popen_params)
-    out, err = proc.communicate(image.tostring())
-
-    if proc.returncode:
-        err = "\n".join(["[MoviePy] Running : %s\n" % cmd,
-                         "WARNING: this command returned an error:",
-                         err.decode('utf8')])
-        raise IOError(err)
-
-    del proc
     
