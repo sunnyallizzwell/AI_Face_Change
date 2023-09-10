@@ -321,8 +321,11 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
                 if not roop.globals.keep_frames:
                     util.delete_temp_frames(temp_frame_paths[0])
             else:
-                process_mgr.run_batch_inmem(v.filename, v.finalname, v.startframe, v.endframe, fps,
-                                                                    roop.globals.execution_threads, roop.globals.CFG.frame_buffer_size)
+                if util.has_extension(v.filename, ['gif']):
+                    skip_audio = True
+                else:
+                    skip_audio = roop.globals.skip_audio
+                process_mgr.run_batch_inmem(v.filename, v.finalname, v.startframe, v.endframe, fps,roop.globals.execution_threads, skip_audio)
                 
             if not roop.globals.processing:
                 end_processing('Processing stopped!')

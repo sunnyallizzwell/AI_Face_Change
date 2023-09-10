@@ -258,7 +258,6 @@ def run():
                         max_threads = gr.Slider(1, 64, value=roop.globals.CFG.max_threads, label="Max. Number of Threads", info='default: 8', step=1.0, interactive=True)
                     with gr.Column():
                         memory_limit = gr.Slider(0, 128, value=roop.globals.CFG.memory_limit, label="Max. Memory to use (Gb)", info='0 meaning no limit', step=1.0, interactive=True)
-                        frame_buffer_size = gr.Slider(1, 512, value=roop.globals.CFG.frame_buffer_size, label="Frame Buffer Size", info='Num. Images to preload for each thread', step=1.0, interactive=True)
                         settings_controls.append(gr.Dropdown(image_formats, label="Image Output Format", info='default: png', value=roop.globals.CFG.output_image_format, elem_id='output_image_format', interactive=True))
                     with gr.Column():
                         settings_controls.append(gr.Dropdown(video_codecs, label="Video Codec", info='default: libx264', value=roop.globals.CFG.output_video_codec, elem_id='output_video_codec', interactive=True))
@@ -332,7 +331,6 @@ def run():
                 s.select(fn=on_settings_changed)
             max_threads.input(fn=lambda a,b='max_threads':on_settings_changed_misc(a,b), inputs=[max_threads])
             memory_limit.input(fn=lambda a,b='memory_limit':on_settings_changed_misc(a,b), inputs=[memory_limit])
-            frame_buffer_size.input(fn=lambda a,b='frame_buffer_size':on_settings_changed_misc(a,b), inputs=[frame_buffer_size])
             video_quality.input(fn=lambda a,b='video_quality':on_settings_changed_misc(a,b), inputs=[video_quality])
 
             button_clean_temp.click(fn=clean_temp, outputs=[bt_srcimg, input_faces, target_faces, bt_destfiles])

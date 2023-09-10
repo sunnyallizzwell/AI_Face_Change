@@ -188,7 +188,7 @@ class ProcessMgr():
             
 
 
-    def run_batch_inmem(self, source_video, target_video, frame_start, frame_end, fps, threads:int = 1, buffersize=32):
+    def run_batch_inmem(self, source_video, target_video, frame_start, frame_end, fps, threads:int = 1, skip_audio=False):
         cap = cv2.VideoCapture(source_video)
         # frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         frame_count = (frame_end - frame_start) + 1
@@ -199,10 +199,6 @@ class ProcessMgr():
         total = frame_count
         self.num_threads = threads
 
-        print(f'Detected {os.cpu_count()} CPU Cores')
-
-        if buffersize < 1:
-            buffersize = 1
         self.processing_threads = self.num_threads
         self.frames_queue = []
         self.processed_queue = []
@@ -211,7 +207,7 @@ class ProcessMgr():
             self.processed_queue.append(Queue(1))
 
         self.videowriter =  FFMPEG_VideoWriter(target_video, (width, height), fps, codec=roop.globals.video_encoder, crf=roop.globals.video_quality, audiofile=None)
-        if frame_start > 0:
+        if not skip_audio and frame_start > 0:
             print('Writing offset frames')
             num_write = frame_start
             cap.set(cv2.CAP_PROP_POS_FRAMES,frame_start)
