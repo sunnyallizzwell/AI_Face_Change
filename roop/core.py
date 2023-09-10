@@ -335,7 +335,7 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
             if os.path.isfile(video_file_name):
                 destination = ''
                 if util.has_extension(v.filename, ['gif']):
-                    gifname = util.get_destfilename_from_path(v.filename, './output', '.gif')
+                    gifname = util.get_destfilename_from_path(v.filename, roop.globals.output_path, '.gif')
                     destination = util.replace_template(gifname, index=index)
                     pathlib.Path(os.path.dirname(destination)).mkdir(parents=True, exist_ok=True)
 

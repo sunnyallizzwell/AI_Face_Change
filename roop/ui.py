@@ -163,7 +163,7 @@ def run():
                 with gr.Row(variant='panel'):
                     with gr.Column():
                         bt_start = gr.Button("▶ Start", variant='primary')
-                        gr.Button("👀 Open Output Folder", size='sm').click(fn=lambda: util.open_folder(util.resolve_relative_path('../output/')))
+                        gr.Button("👀 Open Output Folder", size='sm').click(fn=lambda: util.open_folder(roop.globals.output_path))
                     with gr.Column():
                         bt_stop = gr.Button("⏹ Stop", variant='secondary')
                     with gr.Column(scale=2):
@@ -255,7 +255,7 @@ def run():
                         settings_controls.append(gr.Dropdown(providerlist, label="Provider", value=roop.globals.CFG.provider, elem_id='provider', interactive=True))
                         chk_det_size = gr.Checkbox(label="Use default Det-Size", value=True, elem_id='default_det_size', interactive=True)
                         settings_controls.append(gr.Checkbox(label="Force CPU for Face Analyser", value=roop.globals.CFG.force_cpu, elem_id='force_cpu', interactive=True))
-                        max_threads = gr.Slider(1, 64, value=roop.globals.CFG.max_threads, label="Max. Number of Threads", info='default: 8', step=1.0, interactive=True)
+                        max_threads = gr.Slider(1, 32, value=roop.globals.CFG.max_threads, label="Max. Number of Threads", info='default: 3', step=1.0, interactive=True)
                     with gr.Column():
                         memory_limit = gr.Slider(0, 128, value=roop.globals.CFG.memory_limit, label="Max. Memory to use (Gb)", info='0 meaning no limit', step=1.0, interactive=True)
                         settings_controls.append(gr.Dropdown(image_formats, label="Image Output Format", info='default: png', value=roop.globals.CFG.output_image_format, elem_id='output_image_format', interactive=True))
@@ -691,7 +691,7 @@ def start_swap( enhancer, detection, keep_frames, skip_audio, face_distance, ble
     batch_process(list_files_process, use_clip, clip_text, processing_method == "In-Memory", progress)
     is_processing = False
     outdir = pathlib.Path(roop.globals.output_path)
-    outfiles = [item for item in outdir.iterdir() if item.is_file()]
+    outfiles = [item for item in outdir.rglob("*") if item.is_file()]
     if len(outfiles) > 0:
         yield gr.Button.update(variant="primary"),gr.Files.update(value=outfiles)
     else:
@@ -830,8 +830,7 @@ def on_cut_video(files, cut_start_frame, cut_end_frame):
     resultfiles = []
     for tf in files:
         f = tf.name
-        # destfile = get_destfilename_from_path(f, resolve_relative_path('./output'), '_cut')
-        destfile = util.get_destfilename_from_path(f, './output', '_cut')
+        destfile = util.get_destfilename_from_path(f, roop.globals.output_path, '_cut')
         util.cut_video(f, destfile, cut_start_frame, cut_end_frame)
         if os.path.isfile(destfile):
             resultfiles.append(destfile)
@@ -846,7 +845,7 @@ def on_join_videos(files):
     filenames = []
     for f in files:
         filenames.append(f.name)
-    destfile = util.get_destfilename_from_path(filenames[0], './output', '_join')        
+    destfile = util.get_destfilename_from_path(filenames[0], roop.globals.output_path, '_join')        
     util.join_videos(filenames, destfile)
     resultfiles = []
     if os.path.isfile(destfile):
