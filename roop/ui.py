@@ -282,7 +282,7 @@ def run():
             bt_remove_selected_target_face.click(fn=remove_selected_target_face, outputs=[target_faces])
 
             forced_fps.change(fn=on_fps_changed, inputs=[forced_fps], show_progress='hidden')
-            bt_destfiles.change(fn=on_destfiles_changed, inputs=[bt_destfiles], outputs=[preview_frame_num, text_frame_clip], show_progress='hidden').then(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top], show_progress='hidden')
+            bt_destfiles.change(fn=on_destfiles_changed, inputs=[bt_destfiles], outputs=[preview_frame_num, text_frame_clip], show_progress='hidden').then(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top], show_progress='full')
             bt_destfiles.select(fn=on_destfiles_selected, outputs=[preview_frame_num, text_frame_clip, forced_fps], show_progress='hidden').then(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top], show_progress='hidden')
             bt_destfiles.clear(fn=on_clear_destfiles, outputs=[target_faces])
             resultfiles.select(fn=on_resultfiles_selected, inputs=[resultfiles], outputs=[resultimage])
@@ -688,7 +688,7 @@ def start_swap( enhancer, detection, keep_frames, skip_audio, face_distance, ble
     roop.globals.video_quality = roop.globals.CFG.video_quality
     roop.globals.max_memory = roop.globals.CFG.memory_limit if roop.globals.CFG.memory_limit > 0 else None
 
-    batch_process(list_files_process, use_clip, clip_text, processing_method == "In-Memory")
+    batch_process(list_files_process, use_clip, clip_text, processing_method == "In-Memory", progress)
     is_processing = False
     outdir = pathlib.Path(roop.globals.output_path)
     outfiles = [item for item in outdir.iterdir() if item.is_file()]

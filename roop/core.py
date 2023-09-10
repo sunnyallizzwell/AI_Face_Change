@@ -222,7 +222,7 @@ def live_swap(frame, swap_mode, use_clip, clip_text, selected_index = 0):
         return frame
 
     if process_mgr is None:
-        process_mgr = ProcessMgr()
+        process_mgr = ProcessMgr(None)
     
     options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, swap_mode, selected_index, clip_text)
     process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)
@@ -244,7 +244,7 @@ def preview_mask(frame, clip_text):
 
 
 
-def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_method) -> None:
+def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_method, progress) -> None:
     global clip_text, process_mgr
 
     roop.globals.processing = True
@@ -278,7 +278,7 @@ def batch_process(files:list[ProcessEntry], use_clip, new_clip_text, use_new_met
 
 
     if process_mgr is None:
-        process_mgr = ProcessMgr()
+        process_mgr = ProcessMgr(progress)
     
     options = ProcessOptions(get_processing_plugins(use_clip), roop.globals.distance_threshold, roop.globals.blend_ratio, roop.globals.face_swap_mode, 0, new_clip_text)
     process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)

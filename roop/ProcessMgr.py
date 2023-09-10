@@ -52,6 +52,9 @@ class ProcessMgr():
 
     videowriter= None
 
+    progress_gradio = None
+    total_frames = 0
+
     
 
     # 5-point template constant for face alignment - don't ask
@@ -68,8 +71,9 @@ class ProcessMgr():
     'dmdnet'        : 'Enhance_DMDNet',
     }
 
-    def __init__(self):
-        pass
+    def __init__(self, progress):
+        if progress is not None:
+            self.progress_gradio = progress
 
 
     def initialize(self, input_faces, target_faces, options):
@@ -106,9 +110,9 @@ class ProcessMgr():
 
     def run_batch(self, source_files, target_files, threads:int = 1):
         progress_bar_format = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]'
-        total = len(source_files)
+        self.total_frames = len(source_files)
         self.num_threads = threads
-        with tqdm(total=total, desc='Processing', unit='frame', dynamic_ncols=True, bar_format=progress_bar_format) as progress:
+        with tqdm(total=self.total_frames, desc='Processing', unit='frame', dynamic_ncols=True, bar_format=progress_bar_format) as progress:
             with ThreadPoolExecutor(max_workers=threads) as executor:
                 futures = []
                 queue = create_queue(source_files)
@@ -195,8 +199,7 @@ class ProcessMgr():
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        progress_bar_format = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]'
-        total = frame_count
+        self.total_frames = frame_count
         self.num_threads = threads
 
         self.processing_threads = self.num_threads
@@ -223,7 +226,8 @@ class ProcessMgr():
         writethread = Thread(target=self.write_frames_thread)
         writethread.start()
 
-        with tqdm(total=total, desc='Processing', unit='frames', dynamic_ncols=True, bar_format=progress_bar_format) as progress:
+        progress_bar_format = '{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]'
+        with tqdm(total=self.total_frames, desc='Processing', unit='frames', dynamic_ncols=True, bar_format=progress_bar_format) as progress:
             with ThreadPoolExecutor(thread_name_prefix='swap_proc', max_workers=self.num_threads) as executor:
                 futures = []
                 
@@ -253,6 +257,7 @@ class ProcessMgr():
             'execution_threads': self.num_threads
         })
         progress.update(1)
+        self.progress_gradio((progress.n, self.total_frames), desc='Processing', total=self.total_frames, unit='frames')
 
 
 
