@@ -11,8 +11,6 @@ def get_image_frame(filename: str):
         print(f"Exception reading {filename}")
     return None
 
-
-
     
 def get_video_frame(video_path: str, frame_number: int = 0) -> Optional[Frame]:
     capture = cv2.VideoCapture(video_path)

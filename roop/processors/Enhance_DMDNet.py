@@ -1,51 +1,51 @@
-from chain_img_processor import ChainImgProcessor, ChainImgPlugin
-import os
-from numpy import asarray
-
+from typing import Any, List, Callable
+import cv2 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import scipy.io as sio
-import numpy as np
 import torch.nn.utils.spectral_norm as SpectralNorm
+import threading
 from torchvision.ops import roi_align
 
 from math import sqrt
-import os
 
-import cv2 
-import os
 from torchvision.transforms.functional import normalize
-import copy
-import threading
+import roop.globals
 
-modname = os.path.basename(__file__)[:-3] # calculating modname
+from roop.typing import Face, Frame
+from roop.utilities import resolve_relative_path
 
-oDMDNet = None
-device = None
 
 THREAD_LOCK_DMDNET = threading.Lock()
 
 
+class Enhance_DMDNet():
 
-# start function
-def start(core:ChainImgProcessor):
-    manifest = { # plugin settings
-        "name": "DMDNet", # name
-        "version": "1.0", # version
+    model_dmdnet = None
+    torchdevice = None
 
-        "default_options": {},
-        "img_processor": {
-            "dmdnet": DMDNETPlugin
-        }
-    }
-    return manifest
-
-def start_with_options(core:ChainImgProcessor, manifest:dict):
-    pass
+    processorname = 'dmdnet'
+    type = 'enhance'
 
 
-class DMDNETPlugin(ChainImgPlugin):
+    def Initialize(self, devicename):
+        if self.model_dmdnet is None:
+            self.model_dmdnet = self.create(devicename)
+            
+
+    # temp_frame already cropped+aligned, bbox not
+    def Run(self, source_face: Face, target_face: Face, temp_frame: Frame) -> Frame:
+        input_size = temp_frame.shape[1]
+
+        result = self.enhance_face(source_face, temp_frame, target_face)
+        scale_factor = int(result.shape[1] / input_size)       
+        return result.astype(np.uint8), scale_factor
+
+
+    def Release(self):
+        self.model_gfpgan = None
+
 
     # https://stackoverflow.com/a/67174339
     def landmarks106_to_68(self, pt106):
@@ -64,34 +64,8 @@ class DMDNETPlugin(ChainImgPlugin):
             pt68.append(pt106[index])
         return pt68
 
-    def init_plugin(self):
-        global create
         
-        if oDMDNet == None:
-            create(self.device)
 
-
-    def process(self, frame, params:dict):
-        if "face_detected" in params:
-            if not params["face_detected"]:
-                return frame
-
-        temp_frame = copy.copy(frame)
-        if "processed_faces" in params:
-            for face in params["processed_faces"]:
-                start_x, start_y, end_x, end_y = map(int, face['bbox'])
-                temp_face, start_x, start_y, end_x, end_y = self.cutout(temp_frame, start_x, start_y, end_x, end_y, 0.5)
-                if temp_face.size:
-                    temp_face = self.enhance_face(params["input_face_datas"][0], temp_face, face, start_x, start_y)
-                    temp_face = cv2.resize(temp_face, (end_x - start_x,end_y - start_y), interpolation = cv2.INTER_LANCZOS4)
-                    temp_frame = self.paste_into(temp_face, temp_frame, start_x, start_y, end_x, end_y, True)
-
-
-        if not "blend_ratio" in params: 
-            return temp_frame
-        
-        blend_ratio = params["blend_ratio"]
-        return cv2.addWeighted(temp_frame, blend_ratio, frame, 1.0 - blend_ratio,0)
 
     def check_bbox(self, imgs, boxes):
         boxes = boxes.view(-1, 4, 4)
@@ -105,20 +79,46 @@ class DMDNETPlugin(ChainImgPlugin):
             cv2.imwrite('dmdnet_{:02d}.png'.format(i), img2)
             i += 1
 
-    # clip: cutout face: face struct
-    def enhance_face(self, ref_face, clip, face, x_offs, y_offs):
-        global device
 
+    def trans_points2d(self, pts, M):
+        new_pts = np.zeros(shape=pts.shape, dtype=np.float32)
+        for i in range(pts.shape[0]):
+            pt = pts[i]
+            new_pt = np.array([pt[0], pt[1], 1.0], dtype=np.float32)
+            new_pt = np.dot(M, new_pt)
+            new_pts[i] = new_pt[0:2]
+
+        return new_pts
+
+
+    def enhance_face(self, ref_face, temp_frame, face):
+        # preprocess
+        start_x, start_y, end_x, end_y = map(int, face['bbox'])
+        width = end_x - start_x
+        height = end_y - start_y
+        
+        
         lm106 = face.landmark_2d_106
-        lq_landmarks = asarray(self.landmarks106_to_68(lm106))
+        lq_landmarks = np.asarray(self.landmarks106_to_68(lm106))
 
-        sub = np.full_like(lq_landmarks, [x_offs, y_offs])
-        lq_landmarks = lq_landmarks - sub
+        if temp_frame.shape[0] != 512 or temp_frame.shape[1] != 512:
+            # scale to 512x512
+            scale_factor = 512 / temp_frame.shape[1]
 
-        lq,lq_landmarks = read_img_tensor(clip, lq_landmarks)
+            M = face.matrix * scale_factor
+
+            lq_landmarks = self.trans_points2d(lq_landmarks, M)
+            temp_frame = cv2.resize(temp_frame, (512,512), interpolation = cv2.INTER_AREA)
+
+        if temp_frame.ndim == 2:
+            temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_GRAY2RGB)  # GGG
+        # else:
+        #     temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_BGR2RGB)  # RGB
+
+        lq = read_img_tensor(temp_frame)
 
         LQLocs = get_component_location(lq_landmarks)
-        #self.check_bbox(lq, LQLocs.unsqueeze(0))
+        # self.check_bbox(lq, LQLocs.unsqueeze(0))
 
         # specific
         # start_x, start_y, end_x, end_y = map(int, ref_face['bbox'])
@@ -153,10 +153,10 @@ class DMDNETPlugin(ChainImgPlugin):
         with torch.no_grad():
             with THREAD_LOCK_DMDNET:
                 try:
-                    GenericResult, SpecificResult = oDMDNet(lq = lq.to(device), loc = LQLocs.unsqueeze(0), sp_256 = SpMem256Para, sp_128 = SpMem128Para, sp_64 = SpMem64Para)
+                    GenericResult, SpecificResult = self.model_dmdnet(lq = lq.to(self.torchdevice), loc = LQLocs.unsqueeze(0), sp_256 = SpMem256Para, sp_128 = SpMem128Para, sp_64 = SpMem64Para)
                 except Exception as e:
                     print(f'Error {e} there may be something wrong with the detected component locations.')
-                    return clip
+                    return temp_frame
         save_generic = GenericResult * 0.5 + 0.5
         save_generic = save_generic.squeeze(0).permute(1, 2, 0).flip(2) # RGB->BGR
         save_generic = np.clip(save_generic.float().cpu().numpy(), 0, 1) * 255.0
@@ -166,51 +166,33 @@ class DMDNETPlugin(ChainImgPlugin):
         check_lq = np.clip(check_lq.float().cpu().numpy(), 0, 1) * 255.0
         enhanced_img =  np.hstack((check_lq, save_generic))
         temp_frame =  save_generic.astype("uint8")
-        # temp_frame = save_generic.astype("uint8")
+        temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_RGB2BGR)  # RGB
         return temp_frame
     
 
-def create(devicename):
-    global device, oDMDNet
+    def create(self, devicename):
+        self.torchdevice = torch.device(devicename)
+        model_dmdnet = DMDNet().to(self.torchdevice)
+        weights = torch.load('./models/DMDNet.pth') 
+        model_dmdnet.load_state_dict(weights, strict=True)
 
-    test = "cuda" if torch.cuda.is_available() else "cpu"
-    device = torch.device(devicename)
-    oDMDNet = DMDNet().to(device)
-    weights = torch.load('./models/DMDNet.pth') 
-    oDMDNet.load_state_dict(weights, strict=True)
-
-    oDMDNet.eval()
-    num_params = 0
-    for param in oDMDNet.parameters():
-        num_params += param.numel()
+        model_dmdnet.eval()
+        num_params = 0
+        for param in model_dmdnet.parameters():
+            num_params += param.numel()
+        return model_dmdnet
 
     # print('{:>8s} : {}'.format('Using device', device))
     # print('{:>8s} : {:.2f}M'.format('Model params', num_params/1e6))
 
 
 
-def read_img_tensor(Img=None, landmarks=None): #rgb -1~1 
-#    Img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)  # BGR or G
-    if Img.ndim == 2:
-        Img = cv2.cvtColor(Img, cv2.COLOR_GRAY2RGB)  # GGG
-    else:
-        Img = cv2.cvtColor(Img, cv2.COLOR_BGR2RGB)  # RGB
-    
-    if Img.shape[0] != 512 or Img.shape[1] != 512:
-        y_factor = 512 / Img.shape[0]
-        x_factor = 512 / Img.shape[1]
-        mult = np.full_like(landmarks, [x_factor, y_factor])
-        landmarks = landmarks * mult
-        Img = cv2.resize(Img, (512,512), interpolation = cv2.INTER_AREA)
-
-
-    # ImgForLands = Img.copy()
-
+def read_img_tensor(Img=None): #rgb -1~1 
     Img = Img.transpose((2, 0, 1))/255.0
     Img = torch.from_numpy(Img).float()
     normalize(Img, [0.5,0.5,0.5], [0.5,0.5,0.5], inplace=True)
     ImgTensor = Img.unsqueeze(0)
-    return ImgTensor, landmarks
+    return ImgTensor
 
 
 def get_component_location(Landmarks, re_read=False):
@@ -877,4 +859,3 @@ class UpResBlock(nn.Module):
     def forward(self, x):
         out = x + self.Model(x)
         return out
-
