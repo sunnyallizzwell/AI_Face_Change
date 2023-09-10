@@ -54,7 +54,6 @@ class Settings:
             'live_cam_start_active' : self.live_cam_start_active,
             'max_threads' : self.max_threads,
             'memory_limit' : self.memory_limit,
-            'frame_buffer_size' : self.frame_buffer_size,
             'provider' : self.provider,
             'force_cpu' : self.force_cpu,
 			'output_template' : self.output_template
