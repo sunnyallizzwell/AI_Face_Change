@@ -266,9 +266,9 @@ def str_to_class(module_name, class_name):
         try:
             class_ = getattr(module_, class_name)()
         except AttributeError:
-            print('Class does not exist')
+            print(f'Class {class_name} does not exist')
     except ImportError:
-        print('Module does not exist')
+        print(f'Module {module_name} does not exist')
     return class_ or None
 
 
