@@ -301,9 +301,10 @@ def run():
             start_event = bt_start.click(fn=start_swap, 
                 inputs=[selected_enhancer, selected_face_detection, roop.globals.keep_frames,
                          roop.globals.skip_audio, max_face_distance, blend_ratio, chk_useclip, clip_text,video_swapping_method],
-                outputs=[bt_start, resultfiles]).then(fn=on_resultfiles_finished, inputs=[resultfiles], outputs=[resultimage])
+                outputs=[bt_start, resultfiles])
+            after_swap_event = start_event.then(fn=on_resultfiles_finished, inputs=[resultfiles], outputs=[resultimage])
             
-            bt_stop.click(fn=stop_swap, cancels=[start_event])
+            bt_stop.click(fn=stop_swap, cancels=[start_event, after_swap_event], queue=False)
             
             bt_refresh_preview.click(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top])            
             fake_preview.change(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top])
@@ -342,7 +343,8 @@ def run():
         restart_server = False
         try:
             ui.queue().launch(inbrowser=True, server_name=server_name, server_port=server_port, share=roop.globals.CFG.server_share, ssl_verify=ssl_verify, prevent_thread_lock=True, show_error=True)
-        except:
+        except Exception as e:
+            print(f'Exception {e} when launching Gradio Server!')
             restart_server = True
             run_server = False
         try:

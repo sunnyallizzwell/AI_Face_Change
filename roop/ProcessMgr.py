@@ -296,7 +296,7 @@ class ProcessMgr():
                         del face
 
             elif self.options.swap_mode == "all_female" or self.options.swap_mode == "all_male":
-                gender = 'F' if self.swap_mode == "all_female" else 'M'
+                gender = 'F' if self.options.swap_mode == "all_female" else 'M'
                 for face in faces:
                     if face.sex == gender:
                         temp_frame = self.process_face(self.options.selected_index, face, temp_frame)
