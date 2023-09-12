@@ -118,10 +118,19 @@ def create_gif_from_video(video_path: str, gif_path):
 
 def restore_audio(intermediate_video: str, original_video: str, trim_frame_start, trim_frame_end, final_video : str) -> None:
 	fps = detect_fps(original_video)
-	commands = [ '-i', intermediate_video, '-i', original_video ]
+	commands = [ '-i', intermediate_video ]
 	if trim_frame_start is None and trim_frame_end is None:
 		commands.extend([ '-c:a', 'copy' ])
 	else:
+		# if trim_frame_start is not None:
+		# 	start_time = trim_frame_start / fps
+		# 	commands.extend([ '-ss', format(start_time, ".2f")])
+		# else:
+		# 	commands.extend([ '-ss', '0' ])
+		# if trim_frame_end is not None:
+		# 	end_time = trim_frame_end / fps
+		# 	commands.extend([ '-to', format(end_time, ".2f")])
+		# commands.extend([ '-c:a', 'aac' ])
 		if trim_frame_start is not None:
 			start_time = trim_frame_start / fps
 			commands.extend([ '-ss', format(start_time, ".2f")])
@@ -130,8 +139,9 @@ def restore_audio(intermediate_video: str, original_video: str, trim_frame_start
 		if trim_frame_end is not None:
 			end_time = trim_frame_end / fps
 			commands.extend([ '-to', format(end_time, ".2f")])
-		commands.extend([ '-c:a', 'aac' ])
-	commands.extend([ '-map', '0:v:0', '-map', '1:a:0', '-y', final_video ])
+		commands.extend([ '-i', original_video, "-c",  "copy" ])
+
+	commands.extend([ '-map', '0:v:0', '-map', '1:a:0?', '-shortest', final_video ])
 	run_ffmpeg(commands)
 
 
