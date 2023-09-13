@@ -148,7 +148,7 @@ def run():
                     with gr.Column(scale=1):
                         selected_face_detection = gr.Dropdown(["First found", "All faces", "Selected face", "All female", "All male"], value="First found", label="Select face selection for swapping")
                         max_face_distance = gr.Slider(0.01, 1.0, value=0.65, label="Max Face Similarity Threshold")
-                        video_swapping_method = gr.Dropdown(["Extract Frames to media","In-Memory processing"], value="In-Memory", label="Select video processing method", interactive=True)
+                        video_swapping_method = gr.Dropdown(["Extract Frames to media","In-Memory processing"], value="In-Memory processing", label="Select video processing method", interactive=True)
                         roop.globals.keep_frames = gr.Checkbox(label="Keep Frames (relevant only when extracting frames)", value=False)
                         roop.globals.skip_audio = gr.Checkbox(label="Skip audio", value=False)
                     with gr.Column(scale=1):
@@ -690,7 +690,7 @@ def start_swap( enhancer, detection, keep_frames, skip_audio, face_distance, ble
     roop.globals.video_quality = roop.globals.CFG.video_quality
     roop.globals.max_memory = roop.globals.CFG.memory_limit if roop.globals.CFG.memory_limit > 0 else None
 
-    batch_process(list_files_process, use_clip, clip_text, processing_method == "In-Memory", progress)
+    batch_process(list_files_process, use_clip, clip_text, processing_method == "In-Memory processing", progress)
     is_processing = False
     outdir = pathlib.Path(roop.globals.output_path)
     outfiles = [item for item in outdir.rglob("*") if item.is_file()]
