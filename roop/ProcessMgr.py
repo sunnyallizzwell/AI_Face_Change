@@ -210,15 +210,15 @@ class ProcessMgr():
             self.processed_queue.append(Queue(1))
 
         self.videowriter =  FFMPEG_VideoWriter(target_video, (width, height), fps, codec=roop.globals.video_encoder, crf=roop.globals.video_quality, audiofile=None)
-        if not skip_audio and frame_start > 0:
-            print('Writing offset frames')
-            num_write = frame_start
-            cap.set(cv2.CAP_PROP_POS_FRAMES,frame_start)
-            ret, frame = cap.read()
-            fake_frame = self.process_frame(frame)
-            while num_write > 0:
-                self.videowriter.write_frame(fake_frame)
-                num_write -= 1           
+        # if not skip_audio and frame_start > 0:
+        #     print('Writing offset frames')
+        #     num_write = frame_start
+        #     cap.set(cv2.CAP_PROP_POS_FRAMES,frame_start)
+        #     ret, frame = cap.read()
+        #     fake_frame = self.process_frame(frame)
+        #     while num_write > 0:
+        #         self.videowriter.write_frame(fake_frame)
+        #         num_write -= 1           
 
         readthread = Thread(target=self.read_frames_thread, args=(cap, frame_start, frame_end, threads))
         readthread.start()
