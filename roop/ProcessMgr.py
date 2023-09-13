@@ -314,7 +314,7 @@ class ProcessMgr():
                 scale_factor = 0.0
             elif p.type == 'mask':
                 start_x, start_y, end_x, end_y = map(int, target_face['bbox'])
-                orig_frame = frame[start_y:end_y, start_x:end_x]
+                orig_frame, start_x, start_y, end_x, end_y = self.cutout(frame, start_x, start_y, end_x, end_y)
                 img_mask = p.Run(orig_frame, self.options.masking_text)
             else:
                 enhanced_frame, scale_factor = p.Run(self.input_face_datas[face_index], target_face, fake_frame)
@@ -329,7 +329,7 @@ class ProcessMgr():
         else:
             result = self.paste_upscale(fake_frame, enhanced_frame, target_face.matrix, frame, scale_factor, mask_top)
         if img_mask is not None:
-            target = result[start_y:end_y, start_x:end_x]
+            target, start_x, start_y, end_x, end_y = self.cutout(result, start_x, start_y, end_x, end_y)
             img_mask = cv2.resize(img_mask, (target.shape[1], target.shape[0]))
             img_mask = np.reshape(img_mask, [img_mask.shape[0],img_mask.shape[1],1])
     
@@ -344,7 +344,18 @@ class ProcessMgr():
         
 
 
-    
+    def cutout(self, frame:Frame, start_x, start_y, end_x, end_y):
+        if start_x < 0:
+            start_x = 0
+        if start_y < 0:
+            start_y = 0
+        if end_x > frame.shape[1]:
+            end_x = frame.shape[1]
+        if end_y > frame.shape[0]:
+            end_y = frame.shape[0]
+        return frame[start_y:end_y, start_x:end_x], start_x, start_y, end_x, end_y
+
+        
     
     # Paste back adapted from here
     # https://github.com/fAIseh00d/refacer/blob/main/refacer.py

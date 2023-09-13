@@ -34,7 +34,7 @@ class Mask_Clip2Seg():
 
 
     def Run(self, img1, keywords:str) -> Frame:
-        if keywords is None or len(keywords) < 1:
+        if keywords is None or len(keywords) < 1 or img1 is None:
             return img1
         
         source_image_small = cv2.resize(img1, (256,256))
