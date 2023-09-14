@@ -43,7 +43,7 @@ def update_dependencies():
     os.chdir(MY_PATH)
 	# do a hard reset for to update even if there are local changes
     run_cmd("git fetch --all")
-    run_cmd("git reset --hard origin/main")
+    run_cmd("git reset --hard origin/tkinter")
     run_cmd("git pull")
     # Installs/Updates dependencies from all requirements.txt
     run_cmd("python -m pip install -r requirements.txt")
