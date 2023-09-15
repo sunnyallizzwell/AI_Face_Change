@@ -118,7 +118,7 @@ def run():
                                 local_folder = gr.Textbox(show_label=False, placeholder="/content/", interactive=True)
                         with gr.Row(variant='panel'):
                             bt_srcimg = gr.Image(label='Source Face Image', type='filepath', tool=None, height=233)
-                            bt_destfiles = gr.Files(label='Target File(s)', file_count="multiple", elem_id='filelist', height=233)
+                            bt_destfiles = gr.Files(label='Target File(s)', file_count="multiple", file_types=["image", "video"], elem_id='filelist', height=233)
                         with gr.Row(variant='panel'):
                             gr.Markdown('')
                             forced_fps = gr.Slider(minimum=0, maximum=120, value=0, label="Video FPS", info='Overrides detected fps if not 0', step=1.0, interactive=True, container=True)
@@ -194,7 +194,7 @@ def run():
 
             with gr.Tab("🎉 Extras"):
                 with gr.Row():
-                    files_to_process = gr.Files(label='File(s) to process', file_count="multiple")
+                    files_to_process = gr.Files(label='File(s) to process', file_count="multiple", file_types=["image", "video"])
                 # with gr.Row(variant='panel'):
                 #     with gr.Accordion(label="Post process", open=False):
                 #         with gr.Column():
