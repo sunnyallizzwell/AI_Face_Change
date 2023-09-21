@@ -92,13 +92,7 @@ def extract_frames(target_path : str, trim_frame_start, trim_frame_end, fps : fl
     commands = ['-i', target_path, '-q:v', '1', '-pix_fmt', 'rgb24', ]
     if trim_frame_start is not None and trim_frame_end is not None:
         commands.extend([ '-vf', 'trim=start_frame=' + str(trim_frame_start) + ':end_frame=' + str(trim_frame_end) + ',fps=' + str(fps) ])
-    # elif trim_frame_start is not None:
-	#     commands.extend([ '-vf', 'trim=start_frame=' + str(trim_frame_start) + ',fps=' + str(fps) ])
-    # elif trim_frame_end is not None:
-    # #     commands.extend([ '-vf', 'trim=end_frame=' + str(trim_frame_end) + ',fps=' + str(fps) ])
-    # else:
-	# 	commands.extend([ '-vf', 'fps=' + str(fps) ])
-    commands.extend([os.path.join(temp_directory_path, '%04d.' + roop.globals.CFG.output_image_format)])
+    commands.extend(['-vsync', '0', os.path.join(temp_directory_path, '%04d.' + roop.globals.CFG.output_image_format)])
     return run_ffmpeg(commands)
 
 def create_video(target_path: str, dest_filename: str, fps: float = 24.0) -> None:
