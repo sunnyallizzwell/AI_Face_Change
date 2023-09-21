@@ -21,7 +21,7 @@ execution_providers: List[str] = []
 execution_threads = None
 headless = None
 log_level = 'error'
-selected_enhancer = None
+selected_enhancer = "None"
 FACE_ENHANCER = None
 
 SELECTED_FACE_DATA_INPUT = None
