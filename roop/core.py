@@ -14,7 +14,7 @@ import signal
 import argparse
 import torch
 import onnxruntime
-import tensorflow
+# import tensorflow
 import pathlib
 
 from time import time
@@ -121,11 +121,11 @@ def suggest_execution_threads() -> int:
 
 def limit_resources() -> None:
     # prevent tensorflow memory leak
-    gpus = tensorflow.config.experimental.list_physical_devices('GPU')
-    for gpu in gpus:
-        tensorflow.config.experimental.set_virtual_device_configuration(gpu, [
-            tensorflow.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)
-        ])
+    # gpus = tensorflow.config.experimental.list_physical_devices('GPU')
+    # for gpu in gpus:
+    #     tensorflow.config.experimental.set_virtual_device_configuration(gpu, [
+    #         tensorflow.config.experimental.VirtualDeviceConfiguration(memory_limit=1024)
+    #     ])
     # limit memory usage
     if roop.globals.max_memory:
         memory = roop.globals.max_memory * 1024 ** 3
@@ -192,12 +192,13 @@ def update_status(message: str) -> None:
 
 def start() -> None:
     if roop.globals.headless:
-        faces = extract_face_images(roop.globals.source_path,  (False, 0))
-        roop.globals.INPUT_FACES.append(faces[roop.globals.source_face_index])
-        faces = extract_face_images(roop.globals.target_path,  (False, util.has_image_extension(roop.globals.target_path)))
-        roop.globals.TARGET_FACES.append(faces[roop.globals.target_face_index])
-        if 'face_enhancer' in roop.globals.frame_processors:
-            roop.globals.selected_enhancer = 'GFPGAN'
+        print('Headless mode currently unsupported - starting UI!')
+        # faces = extract_face_images(roop.globals.source_path,  (False, 0))
+        # roop.globals.INPUT_FACES.append(faces[roop.globals.source_face_index])
+        # faces = extract_face_images(roop.globals.target_path,  (False, util.has_image_extension(roop.globals.target_path)))
+        # roop.globals.TARGET_FACES.append(faces[roop.globals.target_face_index])
+        # if 'face_enhancer' in roop.globals.frame_processors:
+        #     roop.globals.selected_enhancer = 'GFPGAN'
        
     batch_process(None, False, None)
 

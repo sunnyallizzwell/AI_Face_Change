@@ -557,6 +557,7 @@ def on_preview_frame_changed(frame_num, files, fake_preview, enhancer, detection
         return None, mask_top
 
     filename = files[selected_preview_index].name
+    # time.sleep(0.3)
     if util.is_video(filename) or filename.lower().endswith('gif'):
         current_frame = get_video_frame(filename, frame_num)
     else:
@@ -564,7 +565,6 @@ def on_preview_frame_changed(frame_num, files, fake_preview, enhancer, detection
     if current_frame is None:
         return None, mask_top
     
-    time.sleep(0.2)
 
     if not fake_preview or len(roop.globals.INPUT_FACES) < 1:
         return convert_to_gradio(current_frame), mask_top
