@@ -62,7 +62,7 @@ def create_root(start: Callable, destroy: Callable) -> ctk.CTk:
     base_x1 = 0.075
     base_x2 = 0.575
     base_y = 0.635
-    
+
     source_button = ctk.CTkButton(root, text='Select image with face(s)', width=IMAGE_BUTTON_WIDTH, height=IMAGE_BUTTON_HEIGHT, compound='top', anchor='center', command=lambda: select_source_path())
     source_button.place(relx=base_x1, rely=0.05)
 
@@ -72,11 +72,12 @@ def create_root(start: Callable, destroy: Callable) -> ctk.CTk:
     enhance_label = ctk.CTkLabel(root, text='Select face enhancement engine', anchor='w')
     enhance_label.place(relx=base_x1, rely=0.49)
     enhance_label.configure(text_color=ctk.ThemeManager.theme.get('RoopDonate').get('text_color'))
-    
+
     enhancer_cb = ctk.CTkComboBox(root, values=["None", "Codeformer", "DMDNet (unavailable)", "GFPGAN"], width=IMAGE_BUTTON_WIDTH, command=select_enhancer)
-    enhancer_cb.set("None")
+    enhancer_cb.set("None") #this does not call the click handler function
+    select_enhancer("None") #call it manually
     enhancer_cb.place(relx=base_x1, rely=0.532)
-    
+
     keep_fps_value = ctk.BooleanVar(value=roop.globals.keep_fps)
     keep_fps_checkbox = ctk.CTkSwitch(root, text='Keep fps', variable=keep_fps_value, command=lambda: setattr(roop.globals, 'keep_fps', not roop.globals.keep_fps))
     keep_fps_checkbox.place(relx=base_x1, rely=base_y)
@@ -100,7 +101,7 @@ def create_root(start: Callable, destroy: Callable) -> ctk.CTk:
 
 
     base_y = 0.84
-  
+
     start_button = ctk.CTkButton(root, text='Start', command=lambda: select_output_path(start))
     start_button.place(relx=base_x1, rely=base_y, relwidth=0.15, relheight=0.05)
 
@@ -220,7 +221,7 @@ def select_target_path() -> None:
                 selected_frame = int(selected_frame)
             except:
                 selected_frame = 1
-            
+
             selected_frame = max(selected_frame, 1)
             selected_frame = min(selected_frame, max_frame)
             OUTPUT_FACES_DATA = extract_face_images(roop.globals.target_path, (True, selected_frame),face_box_extra_ratio=0.25)
@@ -232,7 +233,7 @@ def select_target_path() -> None:
                     show_face_selection(OUTPUT_FACES_DATA, False)
             else:
                 roop.globals.target_path = None
-        
+
     else:
         roop.globals.target_path = None
 
@@ -276,7 +277,7 @@ def select_enhancer(choice):
 
 def show_result():
     open_with_default_app(roop.globals.output_path)
-    
+
 
 
 def render_image_preview(image_path: str, size: Tuple[int, int]) -> ctk.CTkImage:
