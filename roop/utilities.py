@@ -117,7 +117,7 @@ def clean_temp(target_path: str) -> None:
 
 
 def has_image_extension(image_path: str) -> bool:
-    return image_path.lower().endswith(('png', 'jpg', 'jpeg', 'webp'))
+    return image_path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))
 
 def has_extension(filepath: str, extensions: List[str]) -> bool:
     return filepath.lower().endswith(tuple(extensions))
@@ -126,6 +126,9 @@ def has_extension(filepath: str, extensions: List[str]) -> bool:
 def is_image(image_path: str) -> bool:
     if image_path and os.path.isfile(image_path):
         mimetype, _ = mimetypes.guess_type(image_path)
+        if mimetype is None: #mimetypes doesn't recognize .webp because it is not an official MIME type yet
+            if has_image_extension(image_path): #extra step to check for .webp (and possibly other unofficial MIME file types)
+                return True
         return bool(mimetype and mimetype.startswith('image/'))
     return False
 
@@ -158,7 +161,7 @@ def get_device() -> str:
     if 'CoreMLExecutionProvider' in roop.globals.execution_providers:
         return 'mps'
     return 'cpu'
-    
+
 
 # Taken from https://stackoverflow.com/a/68842705
 def get_platform():
