@@ -240,7 +240,8 @@ def preview_mask(frame, clip_text):
         process_mgr = ProcessMgr(None)
     options = ProcessOptions("mask_clip2seg", roop.globals.distance_threshold, roop.globals.blend_ratio, "None", 0, clip_text)
     process_mgr.initialize(roop.globals.INPUT_FACES, roop.globals.TARGET_FACES, options)
-    return process_mgr.process_mask(frame, maskimage)
+    maskprocessor = next((x for x in process_mgr.processors if x.processorname == 'clip2seg'), None)
+    return process_mgr.process_mask(maskprocessor, frame, maskimage)
     
 
 

@@ -57,11 +57,6 @@ class ProcessMgr():
 
     
 
-    # 5-point template constant for face alignment - don't ask
-    insight_arcface_dst = np.array(
-            [[38.2946, 51.6963], [73.5318, 51.5014], [56.0252, 71.7366],
-            [41.5493, 92.3655], [70.7299, 92.2041]],
-            dtype=np.float32)  
 
     plugins =  { 
     'faceswap'      : 'FaceSwapInsightFace',
@@ -273,7 +268,7 @@ class ProcessMgr():
             face = get_first_face(frame)
             if face is None:
                 return frame
-            return self.process_face(self.options.selected_index, face, temp_frame)
+            temp_frame = self.process_face(self.options.selected_index, face, temp_frame)
 
         else:
             faces = get_all_faces(frame)
@@ -284,7 +279,6 @@ class ProcessMgr():
                 for face in faces:
                     temp_frame = self.process_face(self.options.selected_index, face, temp_frame)
                     del face
-                return temp_frame
             
             elif self.options.swap_mode == "selected":
                 for i,tf in enumerate(self.target_face_datas):
@@ -302,20 +296,20 @@ class ProcessMgr():
                         temp_frame = self.process_face(self.options.selected_index, face, temp_frame)
                     del face
 
+        maskprocessor = next((x for x in self.processors if x.processorname == 'clip2seg'), None)
+        if maskprocessor is not None:
+            temp_frame = self.process_mask(maskprocessor, frame, temp_frame)
         return temp_frame
 
 
     def process_face(self,face_index, target_face, frame:Frame):
         enhanced_frame = None
-        img_mask = None
         for p in self.processors:
             if p.type == 'swap':
                 fake_frame = p.Run(self.input_face_datas[face_index], target_face, frame)
                 scale_factor = 0.0
             elif p.type == 'mask':
-                start_x, start_y, end_x, end_y = map(int, target_face['bbox'])
-                orig_frame, start_x, start_y, end_x, end_y = self.cutout(frame, start_x, start_y, end_x, end_y)
-                img_mask = p.Run(orig_frame, self.options.masking_text)
+                continue
             else:
                 enhanced_frame, scale_factor = p.Run(self.input_face_datas[face_index], target_face, fake_frame)
 
@@ -328,17 +322,6 @@ class ProcessMgr():
             result = self.paste_upscale(fake_frame, fake_frame, target_face.matrix, frame, scale_factor, mask_top)
         else:
             result = self.paste_upscale(fake_frame, enhanced_frame, target_face.matrix, frame, scale_factor, mask_top)
-        if img_mask is not None:
-            target, start_x, start_y, end_x, end_y = self.cutout(result, start_x, start_y, end_x, end_y)
-            img_mask = cv2.resize(img_mask, (target.shape[1], target.shape[0]))
-            img_mask = np.reshape(img_mask, [img_mask.shape[0],img_mask.shape[1],1])
-    
-            target = target.astype(np.float32)
-            clip = (1-img_mask) * target
-            clip += img_mask * orig_frame.astype(np.float32)
-            result[start_y:end_y, start_x:end_x] = clip
-            return result
-
         return result
 
         
@@ -415,17 +398,15 @@ class ProcessMgr():
         return paste_face.astype(np.uint8)
 
 
-    def process_mask(self, frame:Frame, target:Frame):
-        for p in self.processors:
-            if p.type == 'mask':
-                img_mask = p.Run(frame, self.options.masking_text)
-                img_mask = cv2.resize(img_mask, (target.shape[1], target.shape[0]))
-                img_mask = np.reshape(img_mask, [img_mask.shape[0],img_mask.shape[1],1])
-       
-                target = target.astype(np.float32)
-                result = (1-img_mask) * target
-                result += img_mask * frame.astype(np.float32)
-                return np.uint8(result)
+    def process_mask(self, processor, frame:Frame, target:Frame):
+        img_mask = processor.Run(frame, self.options.masking_text)
+        img_mask = cv2.resize(img_mask, (target.shape[1], target.shape[0]))
+        img_mask = np.reshape(img_mask, [img_mask.shape[0],img_mask.shape[1],1])
+
+        target = target.astype(np.float32)
+        result = (1-img_mask) * target
+        result += img_mask * frame.astype(np.float32)
+        return np.uint8(result)
 
             
 
