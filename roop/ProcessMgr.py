@@ -316,12 +316,13 @@ class ProcessMgr():
         upscale = 512
         orig_width = fake_frame.shape[1]
         fake_frame = cv2.resize(fake_frame, (upscale, upscale), cv2.INTER_CUBIC)
-        mask_top = self.input_face_datas[face_index].mask_top
+        mask_offsets = self.input_face_datas[face_index].mask_offsets
+        
         if enhanced_frame is None:
             scale_factor = int(upscale / orig_width)
-            result = self.paste_upscale(fake_frame, fake_frame, target_face.matrix, frame, scale_factor, mask_top)
+            result = self.paste_upscale(fake_frame, fake_frame, target_face.matrix, frame, scale_factor, mask_offsets)
         else:
-            result = self.paste_upscale(fake_frame, enhanced_frame, target_face.matrix, frame, scale_factor, mask_top)
+            result = self.paste_upscale(fake_frame, enhanced_frame, target_face.matrix, frame, scale_factor, mask_offsets)
         return result
 
         
@@ -344,15 +345,17 @@ class ProcessMgr():
     # https://github.com/fAIseh00d/refacer/blob/main/refacer.py
     # which is revised insightface paste back code
 
-    def paste_upscale(self, fake_face, upsk_face, M, target_img, scale_factor, mask_top):
+    def paste_upscale(self, fake_face, upsk_face, M, target_img, scale_factor, mask_offsets):
         M_scale = M * scale_factor
         IM = cv2.invertAffineTransform(M_scale)
 
         face_matte = np.full((target_img.shape[0],target_img.shape[1]), 255, dtype=np.uint8)
         ##Generate white square sized as a upsk_face
         img_matte = np.full((upsk_face.shape[0],upsk_face.shape[1]), 255, dtype=np.uint8)
-        if mask_top > 0:
-            img_matte[:mask_top,:] = 0
+        if mask_offsets[0] > 0:
+            img_matte[:mask_offsets[0],:] = 0
+        if mask_offsets[1] > 0:
+            img_matte[-mask_offsets[1]:,:] = 0
 
         ##Transform white square back to target_img
         img_matte = cv2.warpAffine(img_matte, IM, (target_img.shape[1], target_img.shape[0]), flags=cv2.INTER_NEAREST, borderValue=0.0) 
@@ -419,6 +422,4 @@ class ProcessMgr():
         for p in self.processors:
             p.Release()
         self.processors.clear()
-
-        
 
