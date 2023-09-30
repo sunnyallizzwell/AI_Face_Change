@@ -94,6 +94,10 @@ def create_root(start: Callable, destroy: Callable) -> ctk.CTk:
     many_faces_switch = ctk.CTkSwitch(root, text='Many faces', variable=many_faces_value, command=lambda: setattr(roop.globals, 'many_faces', many_faces_value.get()))
     many_faces_switch.place(relx=base_x2, rely=0.68)
 
+    rebuild_video_value = ctk.BooleanVar(value=roop.globals.rebuild_video)
+    rebuild_video_switch = ctk.CTkSwitch(root, text='Rebuild video from existing frames', variable=rebuild_video_value, command=lambda: setattr(roop.globals, 'rebuild_video', rebuild_video_value.get()))
+    rebuild_video_switch.place(relx=base_x2, rely=0.725)
+
     use_batch_value = ctk.BooleanVar(value=roop.globals.use_batch)
     use_batch_switch = ctk.CTkSwitch(root, text='Batch process folder', variable=use_batch_value, command=lambda: setattr(roop.globals, 'use_batch', use_batch_value.get()))
     use_batch_switch.place(relx=base_x1, rely=0.725)

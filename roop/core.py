@@ -22,6 +22,7 @@ import roop.metadata
 import roop.ui as ui
 from roop.processors.frame.core import get_frame_processors_modules
 from roop.utilities import has_image_extension, is_image, is_video, detect_fps, create_video, extract_frames, get_temp_frame_paths, restore_audio, create_temp, move_temp, clean_temp, normalize_output_path, has_extension
+from roop.utilities import get_temp_directory_path
 from roop.face_analyser import extract_face_images
 
 if 'ROCMExecutionProvider' in roop.globals.execution_providers:
@@ -187,20 +188,24 @@ def start() -> None:
             update_status('Processing to image failed!')
         return
 
-    update_status('Creating temp resources...')
-    create_temp(current_target)
-    update_status('Extracting frames...')
-    extract_frames(current_target)
-    temp_frame_paths = get_temp_frame_paths(current_target)
+    if roop.globals.rebuild_video==False:
+        update_status('Creating temp resources...')
+        create_temp(current_target)
+        update_status('Extracting frames...')
+        extract_frames(current_target)
+        temp_frame_paths = get_temp_frame_paths(current_target)
 
-    for frame_processor in get_frame_processors_modules(roop.globals.frame_processors):
-        if frame_processor.NAME == 'ROOP.FACE-ENHANCER' and roop.globals.selected_enhancer == 'None':
-            continue
+        for frame_processor in get_frame_processors_modules(roop.globals.frame_processors):
+            if frame_processor.NAME == 'ROOP.FACE-ENHANCER' and roop.globals.selected_enhancer == 'None':
+                continue
 
-        update_status(f'{frame_processor.NAME} in progress...')
-        frame_processor.process_video(roop.globals.SELECTED_FACE_DATA_INPUT, roop.globals.SELECTED_FACE_DATA_OUTPUT, temp_frame_paths)
-        frame_processor.post_process()
-        release_resources()
+            update_status(f'{frame_processor.NAME} in progress...')
+            frame_processor.process_video(roop.globals.SELECTED_FACE_DATA_INPUT, roop.globals.SELECTED_FACE_DATA_OUTPUT, temp_frame_paths)
+            frame_processor.post_process()
+            release_resources()
+    else:
+        print("rebuilding video from frames in:",get_temp_directory_path(current_target))
+
     # handles fps
     if roop.globals.keep_fps:
         update_status('Detecting fps...')
