@@ -10,6 +10,7 @@ keep_fps = None
 keep_frames = None
 skip_audio = None
 many_faces = None
+rebuild_video=False
 use_batch = None
 source_face_index = 0
 target_face_index = 0
