@@ -7,6 +7,7 @@ import shutil
 import roop.globals
 import roop.metadata
 import roop.utilities as util
+import roop.util_ffmpeg as ffmpeg
 
 from roop.face_util import extract_face_images
 from roop.capturer import get_video_frame, get_video_frame_total, get_image_frame
@@ -81,6 +82,7 @@ def run():
     roop.globals.execution_providers = decode_execution_providers([roop.globals.CFG.provider])
     print(f'Using provider {roop.globals.execution_providers} - Device:{util.get_device()}')    
     
+
     run_server = True
     mycss = """
         span {color: var(--block-info-text-color)}
@@ -151,11 +153,13 @@ def run():
                         selected_face_detection = gr.Dropdown(["First found", "All faces", "Selected face", "All female", "All male"], value="First found", label="Select face selection for swapping")
                         max_face_distance = gr.Slider(0.01, 1.0, value=0.65, label="Max Face Similarity Threshold")
                         video_swapping_method = gr.Dropdown(["Extract Frames to media","In-Memory processing"], value="In-Memory processing", label="Select video processing method", interactive=True)
-                        roop.globals.keep_frames = gr.Checkbox(label="Keep Frames (relevant only when extracting frames)", value=False)
                         roop.globals.skip_audio = gr.Checkbox(label="Skip audio", value=False)
                     with gr.Column(scale=1):
                         selected_enhancer = gr.Dropdown(["None", "Codeformer", "DMDNet", "GFPGAN"], value="None", label="Select post-processing")
                         blend_ratio = gr.Slider(0.0, 1.0, value=0.65, label="Original/Enhanced image blend ratio")
+                        with gr.Box():
+                            roop.globals.keep_frames = gr.Checkbox(label="Keep Frames (relevant only when extracting frames)", value=False)
+                            roop.globals.wait_after_extraction = gr.Checkbox(label="Wait for user key press before creating video ", value=False)
                     with gr.Column(scale=1):
                         chk_useclip = gr.Checkbox(label="Use Text Masking", value=False)
                         clip_text = gr.Textbox(label="List of objects to mask and restore back on fake image", placeholder="cup,hands,hair,banana" ,elem_id='tooltip')
@@ -174,7 +178,8 @@ def run():
                     with gr.Column():
                         resultfiles = gr.Files(label='Processed File(s)', interactive=False)
                     with gr.Column():
-                        resultimage = gr.Image(type='filepath', label='Final Image', interactive=False, )
+                        resultimage = gr.Image(type='filepath', label='Final Image', interactive=False )
+                        resultvideo = gr.Video(label='Final Video', interactive=False, visible=False)
                                 
                         
             with gr.Tab("🎥 Live Cam"):
@@ -217,25 +222,30 @@ def run():
                             with gr.Column():
                                 cut_end_time = gr.Slider(1, 1000000, value=1, label="End Frame", step=1.0, interactive=True)
                             with gr.Column():
-                                start_cut_video = gr.Button("Start")
+                                start_cut_video = gr.Button("Cut video")
+                                start_extract_frames = gr.Button("Extract frames")
 
-    #                     with gr.Row(variant='panel'):
-    #                         with gr.Column():
-    #                             gr.Markdown("""
-    #                                         # Join videos
-    #                                         This also re-encodes the videos like cutting above.
-    # """)
-    #                         with gr.Column():
-    #                             start_join_videos = gr.Button("Start")
                         with gr.Row(variant='panel'):
-                            gr.Markdown("Extract frames from video")
-                            start_extract_frames = gr.Button("Start")
+                            with gr.Column():
+                                gr.Markdown("""
+                                            # Join videos
+    """)
+                            with gr.Column():
+                                extras_chk_encode = gr.Checkbox(label='Re-encode video (necessary for videos with different codecs)', value=False)
+                                start_join_videos = gr.Button("Start")
                         with gr.Row(variant='panel'):
-                            gr.Markdown("Create video from image files")
-                            gr.Button("Start").click(fn=lambda: gr.Info('Not yet implemented...'))
-                        with gr.Row(variant='panel'):
-                            gr.Markdown("Create GIF from video")
-                            start_create_gif = gr.Button("Create GIF")
+                            with gr.Column():
+                                gr.Markdown("""
+                                            # Create video/gif from images
+    """)
+                            with gr.Column():
+                                extras_fps = gr.Slider(minimum=0, maximum=120, value=30, label="Video FPS", step=1.0, interactive=True)
+                                extras_images_folder = gr.Textbox(show_label=False, placeholder="/content/", interactive=True)
+                            with gr.Column():
+                                extras_chk_creategif = gr.Checkbox(label='Create GIF from video', value=False)
+                                extras_create_video=gr.Button("Create")
+                with gr.Row():
+                    gr.Button("👀 Open Output Folder", size='sm').click(fn=lambda: util.open_folder(roop.globals.output_path))
                 with gr.Row():
                     extra_files_output = gr.Files(label='Resulting output files', file_count="multiple")
                         
@@ -288,7 +298,7 @@ def run():
             bt_destfiles.change(fn=on_destfiles_changed, inputs=[bt_destfiles], outputs=[preview_frame_num, text_frame_clip], show_progress='hidden').then(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top, mask_bottom], show_progress='full')
             bt_destfiles.select(fn=on_destfiles_selected, outputs=[preview_frame_num, text_frame_clip, forced_fps], show_progress='hidden').then(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top, mask_bottom], show_progress='hidden')
             bt_destfiles.clear(fn=on_clear_destfiles, outputs=[target_faces])
-            resultfiles.select(fn=on_resultfiles_selected, inputs=[resultfiles], outputs=[resultimage])
+            resultfiles.select(fn=on_resultfiles_selected, inputs=[resultfiles], outputs=[resultimage, resultvideo])
 
             face_selection.select(on_select_face, None, None)
             bt_faceselect.click(fn=on_selected_face, outputs=[input_faces, target_faces, selected_face_detection])
@@ -305,7 +315,7 @@ def run():
                 inputs=[selected_enhancer, selected_face_detection, roop.globals.keep_frames,
                          roop.globals.skip_audio, max_face_distance, blend_ratio, chk_useclip, clip_text,video_swapping_method],
                 outputs=[bt_start, resultfiles])
-            after_swap_event = start_event.then(fn=on_resultfiles_finished, inputs=[resultfiles], outputs=[resultimage])
+            after_swap_event = start_event.then(fn=on_resultfiles_finished, inputs=[resultfiles], outputs=[resultimage, resultvideo])
             
             bt_stop.click(fn=stop_swap, cancels=[start_event, after_swap_event], queue=False)
             
@@ -326,9 +336,10 @@ def run():
 
             # Extras
             start_cut_video.click(fn=on_cut_video, inputs=[files_to_process, cut_start_time, cut_end_time], outputs=[extra_files_output])
-            # start_join_videos.click(fn=on_join_videos, inputs=[files_to_process], outputs=[extra_files_output])
-            start_extract_frames.click(fn=on_extract_frames, inputs=[files_to_process], outputs=[extra_files_output])
-            start_create_gif.click(fn=on_create_gif, inputs=[files_to_process], outputs=[extra_files_output])
+            start_extract_frames.click(fn=on_extras_extract_frames, inputs=[files_to_process], outputs=[extra_files_output])
+            start_join_videos.click(fn=on_join_videos, inputs=[files_to_process, extras_chk_encode], outputs=[extra_files_output])
+            extras_create_video.click(fn=on_extras_create_video, inputs=[extras_images_folder, extras_fps, extras_chk_creategif], outputs=[extra_files_output])
+            
 
             # Settings
             for s in settings_controls:
@@ -774,11 +785,15 @@ def on_destfiles_selected(evt: gr.SelectData):
 def on_resultfiles_selected(evt: gr.SelectData, files):
     selected_index = evt.index
     filename = files[selected_index].name
-    if util.is_video(filename) or filename.lower().endswith('gif'):
-        current_frame = get_video_frame(filename, 0)
+    if util.is_video(filename):
+        return gr.update(visible=False), gr.update(visible=True, value=filename)
     else:
-        current_frame = get_image_frame(filename)
-    return convert_to_gradio(current_frame)
+        if filename.lower().endswith('gif'):
+            current_frame = get_video_frame(filename)
+        else:
+            current_frame = get_image_frame(filename)
+        return gr.update(visible=True, value=convert_to_gradio(current_frame)), gr.update(visible=False)
+
 
 
 def on_resultfiles_finished(files):
@@ -787,11 +802,14 @@ def on_resultfiles_finished(files):
         return None
     
     filename = files[selected_index].name
-    if util.is_video(filename) or filename.lower().endswith('gif'):
-        current_frame = get_video_frame(filename, 0)
+    if util.is_video(filename):
+        return gr.update(visible=False), gr.update(visible=True, value=filename)
     else:
-        current_frame = get_image_frame(filename)
-    return convert_to_gradio(current_frame)
+        if filename.lower().endswith('gif'):
+            current_frame = get_video_frame(filename)
+        else:
+            current_frame = get_image_frame(filename)
+        return gr.update(visible=True, value=convert_to_gradio(current_frame)), gr.update(visible=False)
 
 
     
@@ -842,22 +860,23 @@ def on_cut_video(files, cut_start_frame, cut_end_frame):
     for tf in files:
         f = tf.name
         destfile = util.get_destfilename_from_path(f, roop.globals.output_path, '_cut')
-        util.cut_video(f, destfile, cut_start_frame, cut_end_frame)
+        ffmpeg.cut_video(f, destfile, cut_start_frame, cut_end_frame)
         if os.path.isfile(destfile):
             resultfiles.append(destfile)
         else:
             gr.Error('Cutting video failed!')
     return resultfiles
 
-def on_join_videos(files):
+def on_join_videos(files, chk_encode):
     if files is None:
         return None
     
     filenames = []
     for f in files:
         filenames.append(f.name)
-    destfile = util.get_destfilename_from_path(filenames[0], roop.globals.output_path, '_join')        
-    util.join_videos(filenames, destfile)
+    destfile = util.get_destfilename_from_path(filenames[0], roop.globals.output_path, '_join')
+    sorted_filenames = util.sort_filenames_ignore_path(filenames)        
+    ffmpeg.join_videos(sorted_filenames, destfile, not chk_encode)
     resultfiles = []
     if os.path.isfile(destfile):
         resultfiles.append(destfile)
@@ -867,15 +886,31 @@ def on_join_videos(files):
 
 
 
+def on_extras_create_video(images_path,fps, create_gif):
+    util.sort_rename_frames(os.path.dirname(images_path))
+    destfilename = os.path.join(roop.globals.output_path, "img2video." + roop.globals.CFG.output_video_format)
+    ffmpeg.create_video('', destfilename, fps, images_path)
+    resultfiles = []
+    if os.path.isfile(destfilename):
+        resultfiles.append(destfilename)
+    else:
+        return None
+    if create_gif:
+        gifname = util.get_destfilename_from_path(destfilename, './output', '.gif')
+        ffmpeg.create_gif_from_video(destfilename, gifname)
+        if os.path.isfile(destfilename):
+            resultfiles.append(gifname)
+    return resultfiles
+    
 
-def on_extract_frames(files):
+def on_extras_extract_frames(files):
     if files is None:
         return None
     
     resultfiles = []
     for tf in files:
         f = tf.name
-        resfolder = util.extract_frames(f)
+        resfolder = ffmpeg.extract_frames(f)
         for file in os.listdir(resfolder):
             outfile = os.path.join(resfolder, file)
             if os.path.isfile(outfile):
@@ -883,15 +918,6 @@ def on_extract_frames(files):
     return resultfiles
 
 
-def on_create_gif(files):
-    if files is None:
-        return None
-    
-    for tf in files:
-        f = tf.name
-        gifname = util.get_destfilename_from_path(f, './output', '.gif')
-        util.create_gif_from_video(f, gifname)
-    return gifname
 
 
 
