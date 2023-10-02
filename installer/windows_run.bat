@@ -1,5 +1,5 @@
 @echo off
-REM Please set the following commandline arguments to your prefered settings
+REM No CLI arguments supported anymore
 set COMMANDLINE_ARGS=
 
 cd /D "%~dp0"
@@ -67,7 +67,7 @@ if not exist "%INSTALL_ENV_DIR%\python.exe" ( echo. && echo ERROR: Conda environ
 call "%CONDA_ROOT_PREFIX%\condabin\conda.bat" activate "%INSTALL_ENV_DIR%" || ( echo. && echo Miniconda hook not found. && goto end )
 
 @rem setup installer env
-echo Launching roop unleashed - please edit windows_run.bat to customize commandline arguments
+echo Launching roop unleashed
 call python installer.py %COMMANDLINE_ARGS%
 
 echo.

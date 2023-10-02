@@ -10,6 +10,7 @@ frame_processors: List[str] = []
 keep_fps = None
 keep_frames = None
 skip_audio = None
+wait_after_extraction = None
 many_faces = None
 use_batch = None
 source_face_index = 0
