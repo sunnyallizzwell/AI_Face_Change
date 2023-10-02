@@ -119,7 +119,7 @@ def run():
                                 bt_add_local = gr.Button('Add local files from', size='sm')
                                 local_folder = gr.Textbox(show_label=False, placeholder="/content/", interactive=True)
                         with gr.Row(variant='panel'):
-                            bt_srcimg = gr.Image(label='Source Face Image', type='filepath', tool=None, height=233)
+                            bt_srcfiles = gr.Files(label='Source File(s)', file_count="single", file_types=["image", "video"], elem_id='filelist', height=233)
                             bt_destfiles = gr.Files(label='Target File(s)', file_count="multiple", file_types=["image", "video"], elem_id='filelist', height=233)
                         with gr.Row(variant='panel'):
                             gr.Markdown('')
@@ -192,6 +192,16 @@ def run():
                             cam = gr.Webcam(label='Camera', source='webcam', mirror_webcam=True, interactive=True, streaming=False)
                         with gr.Column():
                             fake_cam_image = gr.Image(label='Fake Camera Output', interactive=False)
+
+            with gr.Tab("👨‍👩‍👧‍👦 Face Management"):
+                with gr.Row():
+                    _  = gr.Image(type='filepath', label='Input Image', interactive=False, )
+                    _ = gr.Files(label='Face Blend Files', interactive=True)
+                with gr.Row():
+                    _ = gr.Textbox(show_label=False, placeholder="myfaces.fbz", interactive=True)
+                    _ = gr.Button("Create", variant='primary')
+
+
 
 
             with gr.Tab("🎉 Extras"):
@@ -275,7 +285,7 @@ def run():
                                 max_face_distance, blend_ratio, chk_useclip, clip_text] 
             input_faces.select(on_select_input_face, None, None).then(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top, mask_bottom])
             bt_remove_selected_input_face.click(fn=remove_selected_input_face, outputs=[input_faces])
-            bt_srcimg.change(fn=on_srcimg_changed, show_progress='full', inputs=bt_srcimg, outputs=[dynamic_face_selection, face_selection, input_faces])
+            bt_srcfiles.change(fn=on_srcfile_changed, show_progress='full', inputs=bt_srcfiles, outputs=[dynamic_face_selection, face_selection, input_faces])
 
             mask_top.input(fn=on_mask_top_changed, inputs=[mask_top], show_progress='hidden')
             mask_bottom.input(fn=on_mask_bottom_changed, inputs=[mask_bottom], show_progress='hidden')
@@ -337,7 +347,7 @@ def run():
             memory_limit.input(fn=lambda a,b='memory_limit':on_settings_changed_misc(a,b), inputs=[memory_limit])
             video_quality.input(fn=lambda a,b='video_quality':on_settings_changed_misc(a,b), inputs=[video_quality])
 
-            button_clean_temp.click(fn=clean_temp, outputs=[bt_srcimg, input_faces, target_faces, bt_destfiles])
+            button_clean_temp.click(fn=clean_temp, outputs=[bt_srcfiles, input_faces, target_faces, bt_destfiles])
             button_apply_settings.click(apply_settings, inputs=[themes, input_server_name, input_server_port, output_template])
             button_apply_restart.click(restart)
 
@@ -415,18 +425,16 @@ def on_add_local_folder(folder):
     return files
 
 
-def on_srcimg_changed(imgsrc, progress=gr.Progress()):
+def on_srcfile_changed(srcfile, progress=gr.Progress()):
     global RECENT_DIRECTORY_SOURCE, SELECTION_FACES_DATA, IS_INPUT, input_faces, face_selection, input_thumbs, last_image
     
     IS_INPUT = True
 
-    if imgsrc == None or last_image == imgsrc:
+    if srcfile is None:
         return gr.Column.update(visible=False), None, input_thumbs
     
-    last_image = imgsrc
-    
     progress(0, desc="Retrieving faces from image", )      
-    source_path = imgsrc
+    source_path = srcfile.name
     thumbs = []
     if util.is_image(source_path):
         roop.globals.source_path = source_path

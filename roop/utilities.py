@@ -11,6 +11,7 @@ import torch
 import gradio
 import tempfile
 import cv2
+import zipfile
 
 from pathlib import Path
 from typing import List, Any
@@ -317,6 +318,16 @@ def prepare_for_batch(target_files):
         newname = os.path.basename(f.name)
         shutil.move(f.name, os.path.join(tempfolder, newname))
     return tempfolder
+
+
+def zip(files, zipname):
+    with zipfile.ZipFile(zipname, "w") as zip_file:
+        for f in files:
+            zip_file.write(f)
+
+def unzip(zipfilename:str, target_path:str):
+    with zipfile.ZipFile(zipfilename, "r") as zip_file:
+        zip_file.extractall(target_path)
 
 
 def open_folder(path:str):
