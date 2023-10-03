@@ -12,6 +12,7 @@ import roop.util_ffmpeg as ffmpeg
 from roop.face_util import extract_face_images
 from roop.capturer import get_video_frame, get_video_frame_total, get_image_frame
 from roop.ProcessEntry import ProcessEntry
+from roop.FaceSet import FaceSet
 
 restart_server = False
 live_cam_active = False
@@ -200,11 +201,12 @@ def run():
 
             with gr.Tab("👨‍👩‍👧‍👦 Face Management"):
                 with gr.Row():
-                    _  = gr.Image(type='filepath', label='Input Image', interactive=False, )
-                    _ = gr.Files(label='Face Blend Files', interactive=True)
+                    fb_facesetfiles = gr.Files(label='Face Sets', interactive=True)
+                    fb_files = gr.Files(label='Input Files', interactive=True)
                 with gr.Row():
-                    _ = gr.Textbox(show_label=False, placeholder="myfaces.fbz", interactive=True)
-                    _ = gr.Button("Create", variant='primary')
+                    target_faces = gr.Gallery(label="Face selection", allow_preview=True, preview=True, height=128, object_fit="scale-down")
+                with gr.Row():
+                    fb_create = gr.Button("Create", variant='primary')
 
 
 
@@ -344,6 +346,11 @@ def run():
                 vcam_toggle.change(fn=on_vcam_toggle, inputs=[vcam_toggle, camera_num], outputs=[cam, fake_cam_image])
                 cam.stream(on_stream_swap_cam, inputs=[cam, selected_enhancer, blend_ratio], outputs=[fake_cam_image], preprocess=True, postprocess=True, show_progress="hidden")
 
+            # Face Management
+
+            fb_files.change(fn=on_fb_files_changed, inputs=[fb_files], outputs=[fb_facesetfiles])
+
+
             # Extras
             start_cut_video.click(fn=on_cut_video, inputs=[files_to_process, cut_start_time, cut_end_time], outputs=[extra_files_output])
             start_extract_frames.click(fn=on_extras_extract_frames, inputs=[files_to_process], outputs=[extra_files_output])
@@ -379,18 +386,47 @@ def run():
             run_server = False
         ui.close()
 
+def on_fb_files_changed(inputfiles, progress=gr.Progress()):
+    if inputfiles is None or len(inputfiles) < 1:
+        return None
+    
+    progress(0, desc="Retrieving faces from images", )
+    index = 1      
+    images = []
+    for f in inputfiles:
+        source_path = f.name
+        thumbs = []
+        if util.has_image_extension(source_path):
+            roop.globals.source_path = source_path
+            SELECTION_FACES_DATA = extract_face_images(roop.globals.source_path,  (False, 0), 0.5)
+            for f in SELECTION_FACES_DATA:
+                image = f[1]
+                images.append(image)
+                thumbs.append(convert_to_gradio(image))
+
+    imgnames = []
+    for img in images:
+        filename = os.path.join(roop.globals.output_path, f'{index}.png')
+        cv2.imwrite(filename, img)
+        imgnames.append(filename)
+        index += 1
+
+    finalzip = os.path.join(roop.globals.output_path, 'faceset.fsz')        
+    util.zip(imgnames, finalzip)
+    return finalzip
+
 
 def on_mask_top_changed(mask_offset):
     global SELECTED_INPUT_FACE_INDEX
 
-    if len(roop.globals.INPUT_FACES) > SELECTED_INPUT_FACE_INDEX:
-        roop.globals.INPUT_FACES[SELECTED_INPUT_FACE_INDEX].mask_offsets[0] = mask_offset
+    if len(roop.globals.INPUT_FACESETS) > SELECTED_INPUT_FACE_INDEX:
+        roop.globals.INPUT_FACESETS[SELECTED_INPUT_FACE_INDEX].mask_offsets[0] = mask_offset
 
 def on_mask_bottom_changed(mask_offset):
     global SELECTED_INPUT_FACE_INDEX
 
-    if len(roop.globals.INPUT_FACES) > SELECTED_INPUT_FACE_INDEX:
-        roop.globals.INPUT_FACES[SELECTED_INPUT_FACE_INDEX].mask_offsets[1] = mask_offset
+    if len(roop.globals.INPUT_FACESETS) > SELECTED_INPUT_FACE_INDEX:
+        roop.globals.INPUT_FACESETS[SELECTED_INPUT_FACE_INDEX].mask_offsets[1] = mask_offset
 
 
 
@@ -444,10 +480,31 @@ def on_srcfile_changed(srcfile, progress=gr.Progress()):
     if srcfile is None:
         return gr.Column.update(visible=False), None, input_thumbs
     
-    progress(0, desc="Retrieving faces from image", )      
     source_path = srcfile.name
     thumbs = []
-    if util.is_image(source_path):
+    face_set = FaceSet()
+    if source_path.lower().endswith('fsz'):
+        progress(0, desc="Retrieving faces from Faceset File", )      
+        unzipfolder = '/temp/faceset'
+        if os.path.isdir(unzipfolder):
+            files = os.listdir(unzipfolder)
+            for file in files:
+                os.remove(os.path.join(unzipfolder, file))
+        else:
+            os.makedirs(unzipfolder)
+        util.unzip(source_path, unzipfolder)
+        for file in os.listdir(unzipfolder):
+            if file.endswith(".png"):
+                SELECTION_FACES_DATA = extract_face_images(os.path.join(unzipfolder,file),  (False, 0))
+                for f in SELECTION_FACES_DATA:
+                    f[0].mask_offsets = (0,0)
+                    face_set.faces.append(f[0])
+                    image = convert_to_gradio(f[1])
+                    if len(thumbs) < 1: 
+                        thumbs.append(image)                                        
+                                     
+    elif util.is_image(source_path):
+        progress(0, desc="Retrieving faces from image", )      
         roop.globals.source_path = source_path
         RECENT_DIRECTORY_SOURCE = os.path.dirname(roop.globals.source_path)
         SELECTION_FACES_DATA = extract_face_images(roop.globals.source_path,  (False, 0))
@@ -456,14 +513,21 @@ def on_srcfile_changed(srcfile, progress=gr.Progress()):
             image = convert_to_gradio(f[1])
             thumbs.append(image)
             
-    progress(1.0, desc="Retrieving faces from image")      
+    progress(1.0)      
     if len(thumbs) < 1:
         raise gr.Error('No faces detected!')
 
     if len(thumbs) == 1:
-        face = SELECTION_FACES_DATA[0][0]
-        face.mask_offsets = (0,0)
-        roop.globals.INPUT_FACES.append(face)
+        if len(face_set.faces) > 0:
+            face_set.AverageEmbeddings()
+            roop.globals.INPUT_FACESETS.append(face_set)
+        else:
+            for f in SELECTION_FACES_DATA:
+                face = f[0]
+                face.mask_offsets = (0,0)
+                face_set.faces.append(face)
+                roop.globals.INPUT_FACESETS.append(face_set)
+
         input_thumbs.append(thumbs[0])
         return gr.Column.update(visible=False), None, input_thumbs
        
@@ -478,8 +542,8 @@ def on_select_input_face(evt: gr.SelectData):
 def remove_selected_input_face():
     global input_thumbs, SELECTED_INPUT_FACE_INDEX
 
-    if len(roop.globals.INPUT_FACES) > SELECTED_INPUT_FACE_INDEX:
-        f = roop.globals.INPUT_FACES.pop(SELECTED_INPUT_FACE_INDEX)
+    if len(roop.globals.INPUT_FACESETS) > SELECTED_INPUT_FACE_INDEX:
+        f = roop.globals.INPUT_FACESETS.pop(SELECTED_INPUT_FACE_INDEX)
         del f
     if len(input_thumbs) > SELECTED_INPUT_FACE_INDEX:
         f = input_thumbs.pop(SELECTED_INPUT_FACE_INDEX)
@@ -555,8 +619,10 @@ def on_selected_face():
     fd = SELECTION_FACES_DATA[SELECTED_FACE_INDEX]
     image = convert_to_gradio(fd[1])
     if IS_INPUT:
+        face_set = FaceSet()
         fd[0].mask_offsets = (0,0)
-        roop.globals.INPUT_FACES.append(fd[0])
+        face_set.faces.append(fd[0])
+        roop.globals.INPUT_FACESETS.append(face_set)
         input_thumbs.append(image)
         return input_thumbs, gr.Gallery.update(visible=True), gr.Dropdown.update(visible=True)
     else:
@@ -576,10 +642,10 @@ def on_preview_frame_changed(frame_num, files, fake_preview, enhancer, detection
     from roop.core import live_swap
 
     mask_offsets = (0,0)
-    if len(roop.globals.INPUT_FACES) > SELECTED_INPUT_FACE_INDEX:
-        if not hasattr(roop.globals.INPUT_FACES[SELECTED_INPUT_FACE_INDEX], 'mask_offsets'):
-            roop.globals.INPUT_FACES[SELECTED_INPUT_FACE_INDEX].mask_offsets = mask_offsets
-        mask_offsets = roop.globals.INPUT_FACES[SELECTED_INPUT_FACE_INDEX].mask_offsets
+    if len(roop.globals.INPUT_FACESETS) > SELECTED_INPUT_FACE_INDEX:
+        if not hasattr(roop.globals.INPUT_FACESETS[SELECTED_INPUT_FACE_INDEX], 'mask_offsets'):
+            roop.globals.INPUT_FACESETS[SELECTED_INPUT_FACE_INDEX].mask_offsets = mask_offsets
+        mask_offsets = roop.globals.INPUT_FACESETS[SELECTED_INPUT_FACE_INDEX].mask_offsets
 
     if is_processing or files is None or selected_preview_index >= len(files) or frame_num is None:
         return None, mask_offsets[0], mask_offsets[1]
@@ -594,7 +660,7 @@ def on_preview_frame_changed(frame_num, files, fake_preview, enhancer, detection
         return None, mask_offsets[0], mask_offsets[1]
     
 
-    if not fake_preview or len(roop.globals.INPUT_FACES) < 1:
+    if not fake_preview or len(roop.globals.INPUT_FACESETS) < 1:
         return convert_to_gradio(current_frame), mask_offsets[0], mask_offsets[1]
 
     roop.globals.face_swap_mode = translate_swap_mode(detection)
@@ -656,7 +722,7 @@ def on_clear_input_faces():
     global input_thumbs
     
     input_thumbs.clear()
-    roop.globals.INPUT_FACES.clear()
+    roop.globals.INPUT_FACESETS.clear()
     return input_thumbs
 
 def on_clear_destfiles():
@@ -852,7 +918,7 @@ def on_stream_swap_cam(camimage, enhancer, blend_ratio):
 
     if not cam_swapping:
         cam_swapping = True
-        if len(roop.globals.INPUT_FACES) > 0:
+        if len(roop.globals.INPUT_FACESETS) > 0:
             current_cam_image = live_swap(camimage, "all", False, None, SELECTED_INPUT_FACE_INDEX)
         else:
             current_cam_image = camimage
@@ -938,7 +1004,7 @@ def clean_temp():
     prepare_environment()
    
     input_thumbs.clear()
-    roop.globals.INPUT_FACES.clear()
+    roop.globals.INPUT_FACESETS.clear()
     roop.globals.TARGET_FACES.clear()
     target_thumbs = []
     gr.Info('Temp Files removed')

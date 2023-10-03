@@ -47,7 +47,7 @@ def get_all_faces(frame: Frame) -> Any:
         return None
 
 
-def extract_face_images(source_filename, video_info):
+def extract_face_images(source_filename, video_info, extra_padding=-1.0):
     face_data = []
     source_image = None
     
@@ -59,7 +59,6 @@ def extract_face_images(source_filename, video_info):
             return face_data
     else:
         source_image = cv2.imread(source_filename)
-
         
     faces = get_all_faces(source_image)
     if faces is None:
@@ -68,6 +67,12 @@ def extract_face_images(source_filename, video_info):
     i = 0
     for face in faces:
         (startX, startY, endX, endY) = face['bbox'].astype("int")
+        if extra_padding > 0.0:
+            padding = int((endY - startY) * extra_padding)
+            startY -= padding
+            if startY < 0:
+                startY = 0
+
         face_temp = source_image[startY:endY, startX:endX]
         if face_temp.size < 1:
             continue

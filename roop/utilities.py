@@ -249,7 +249,7 @@ def prepare_for_batch(target_files):
 def zip(files, zipname):
     with zipfile.ZipFile(zipname, "w") as zip_file:
         for f in files:
-            zip_file.write(f)
+            zip_file.write(f, os.path.basename(f))
 
 def unzip(zipfilename:str, target_path:str):
     with zipfile.ZipFile(zipfilename, "r") as zip_file:

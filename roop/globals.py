@@ -33,7 +33,7 @@ processing = False
 
 FACE_ENHANCER = None
 
-INPUT_FACES = []
+INPUT_FACESETS = []
 TARGET_FACES = []
 
 IMAGE_CHAIN_PROCESSOR = None

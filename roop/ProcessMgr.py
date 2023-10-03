@@ -205,15 +205,6 @@ class ProcessMgr():
             self.processed_queue.append(Queue(1))
 
         self.videowriter =  FFMPEG_VideoWriter(target_video, (width, height), fps, codec=roop.globals.video_encoder, crf=roop.globals.video_quality, audiofile=None)
-        # if not skip_audio and frame_start > 0:
-        #     print('Writing offset frames')
-        #     num_write = frame_start
-        #     cap.set(cv2.CAP_PROP_POS_FRAMES,frame_start)
-        #     ret, frame = cap.read()
-        #     fake_frame = self.process_frame(frame)
-        #     while num_write > 0:
-        #         self.videowriter.write_frame(fake_frame)
-        #         num_write -= 1           
 
         readthread = Thread(target=self.read_frames_thread, args=(cap, frame_start, frame_end, threads))
         readthread.start()
@@ -304,19 +295,21 @@ class ProcessMgr():
 
     def process_face(self,face_index, target_face, frame:Frame):
         enhanced_frame = None
+        inputface = self.input_face_datas[face_index].faces[0]
+
         for p in self.processors:
             if p.type == 'swap':
-                fake_frame = p.Run(self.input_face_datas[face_index], target_face, frame)
+                fake_frame = p.Run(inputface, target_face, frame)
                 scale_factor = 0.0
             elif p.type == 'mask':
                 continue
             else:
-                enhanced_frame, scale_factor = p.Run(self.input_face_datas[face_index], target_face, fake_frame)
+                enhanced_frame, scale_factor = p.Run(inputface, target_face, fake_frame)
 
         upscale = 512
         orig_width = fake_frame.shape[1]
         fake_frame = cv2.resize(fake_frame, (upscale, upscale), cv2.INTER_CUBIC)
-        mask_offsets = self.input_face_datas[face_index].mask_offsets
+        mask_offsets = inputface.mask_offsets
         
         if enhanced_frame is None:
             scale_factor = int(upscale / orig_width)

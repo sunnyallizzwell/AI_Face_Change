@@ -44,7 +44,7 @@ def virtualcamera(cam_num):
             if not ret:
                 break
 
-            if len(roop.globals.INPUT_FACES) > 0:
+            if len(roop.globals.INPUT_FACESETS) > 0:
                 frame = live_swap(frame, "all", False, None)
                 cam.send(frame)
             else:
