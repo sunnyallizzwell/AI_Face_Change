@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import os
-import sys
+import sys, time
 # single thread doubles cuda performance - needs to be set before torch import
 if any(arg.startswith('--execution-provider') for arg in sys.argv):
     os.environ['OMP_NUM_THREADS'] = '1'
@@ -147,9 +147,11 @@ def update_status(message: str, scope: str = 'ROOP.CORE') -> None:
     if not roop.globals.headless:
         ui.update_status(message)
 
-
+def time_elapsed_str(start_time) -> str:
+    return  f"Time elapsed: {time.time()-start_time:.2f} secs."
 
 def start() -> None:
+    start_time=time.time()
     if roop.globals.headless:
         faces = extract_face_images(roop.globals.source_path,  (False, 0))
         roop.globals.SELECTED_FACE_DATA_INPUT = faces[roop.globals.source_face_index][0]
@@ -160,7 +162,7 @@ def start() -> None:
 
     if roop.globals.target_folder_path is not None:
         batch_process()
-        update_status('Batch processing finished!')
+        update_status('Batch processing finished! ' +time_elapsed_str(start_time))
         return
 
     for frame_processor in get_frame_processors_modules(roop.globals.frame_processors):
@@ -183,9 +185,9 @@ def start() -> None:
             frame_processor.post_process()
             release_resources()
         if is_image(current_target):
-            update_status('Processing to image succeed!')
+            update_status('Processing to image successful! ' +time_elapsed_str(start_time))
         else:
-            update_status('Processing to image failed!')
+            update_status('Processing to image failed! ' +time_elapsed_str(start_time))
         return
 
     if roop.globals.rebuild_video==False:
@@ -228,9 +230,9 @@ def start() -> None:
     # clean and validate
     clean_temp(current_target)
     if is_video(roop.globals.output_path):
-        update_status('Processing to video succeed!')
+        update_status('Processing to video successful! ' +time_elapsed_str(start_time))
     else:
-        update_status('Processing to video failed!')
+        update_status('Processing to video failed! ' +time_elapsed_str(start_time))
 
 
 def batch_process() -> None:
