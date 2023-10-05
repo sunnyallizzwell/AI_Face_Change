@@ -4,7 +4,7 @@ import numpy as np
 import onnxruntime
 import roop.globals
 
-from roop.typing import Face, Frame
+from roop.typing import Face, Frame, FaceSet
 from roop.utilities import resolve_relative_path
 
 
@@ -25,11 +25,13 @@ class Enhance_GFPGAN():
         if self.model_gfpgan is None:
             model_path = resolve_relative_path('../models/GFPGANv1.4.onnx')
             self.model_gfpgan = onnxruntime.InferenceSession(model_path, None, providers=roop.globals.execution_providers)
+            # replace Mac mps with cpu for the moment
+            devicename = devicename.replace('mps', 'cpu')
             self.devicename = devicename
 
         self.name = self.model_gfpgan.get_inputs()[0].name
 
-    def Run(self, source_face: Face, target_face: Face, temp_frame: Frame) -> Frame:
+    def Run(self, source_faceset: FaceSet, target_face: Face, temp_frame: Frame) -> Frame:
         # preprocess
         input_size = temp_frame.shape[1]
         temp_frame = cv2.resize(temp_frame, (512, 512), cv2.INTER_CUBIC)

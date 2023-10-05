@@ -6,7 +6,7 @@ import onnxruntime
 import onnx
 import roop.globals
 
-from roop.typing import Face, Frame
+from roop.typing import Face, Frame, FaceSet
 from roop.utilities import resolve_relative_path
 
 
@@ -21,8 +21,10 @@ class Enhance_CodeFormer():
     type = 'enhance'
     
 
-    def Initialize(self, devicename):
+    def Initialize(self, devicename:str):
         if self.model_codeformer is None:
+            # replace Mac mps with cpu for the moment
+            devicename = devicename.replace('mps', 'cpu')
             self.devicename = devicename
             model_path = resolve_relative_path('../models/CodeFormer/CodeFormerv0.1.onnx')
             self.model_codeformer = onnxruntime.InferenceSession(model_path, None, providers=roop.globals.execution_providers)
@@ -33,7 +35,7 @@ class Enhance_CodeFormer():
             self.io_binding.bind_output(model_outputs[0].name, self.devicename)
 
 
-    def Run(self, source_face: Face, target_face: Face, temp_frame: Frame) -> Frame:
+    def Run(self, source_faceset: FaceSet, target_face: Face, temp_frame: Frame) -> Frame:
         input_size = temp_frame.shape[1]
         # preprocess
         temp_frame = cv2.resize(temp_frame, (512, 512), cv2.INTER_CUBIC)

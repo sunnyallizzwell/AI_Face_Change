@@ -21,7 +21,7 @@ import roop.globals
 import roop.metadata
 import roop.utilities as util
 import roop.util_ffmpeg as ffmpeg
-import roop.ui as ui
+import ui.main as main
 from settings import Settings
 from roop.face_util import extract_face_images
 from roop.ProcessEntry import ProcessEntry
@@ -350,4 +350,4 @@ def run() -> None:
     roop.globals.video_encoder = roop.globals.CFG.output_video_codec
     roop.globals.video_quality = roop.globals.CFG.video_quality
     roop.globals.max_memory = roop.globals.CFG.memory_limit if roop.globals.CFG.memory_limit > 0 else None
-    ui.run()
+    main.run()

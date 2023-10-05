@@ -42,6 +42,13 @@ def detect_fps(target_path : str) -> float:
     return fps
 
 
+# Gradio wants Images in RGB
+def convert_to_gradio(image):
+    if image is None:
+        return None
+    return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+
 def sort_filenames_ignore_path(filenames):
   """Sorts a list of filenames containing a complete path by their filename,
   while retaining their original path.

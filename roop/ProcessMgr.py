@@ -304,7 +304,7 @@ class ProcessMgr():
             elif p.type == 'mask':
                 continue
             else:
-                enhanced_frame, scale_factor = p.Run(inputface, target_face, fake_frame)
+                enhanced_frame, scale_factor = p.Run(self.input_face_datas[face_index], target_face, fake_frame)
 
         upscale = 512
         orig_width = fake_frame.shape[1]

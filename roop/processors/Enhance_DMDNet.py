@@ -11,10 +11,8 @@ from torchvision.ops import roi_align
 from math import sqrt
 
 from torchvision.transforms.functional import normalize
-import roop.globals
 
-from roop.typing import Face, Frame
-from roop.utilities import resolve_relative_path
+from roop.typing import Face, Frame, FaceSet
 
 
 THREAD_LOCK_DMDNET = threading.Lock()
@@ -35,10 +33,10 @@ class Enhance_DMDNet():
             
 
     # temp_frame already cropped+aligned, bbox not
-    def Run(self, source_face: Face, target_face: Face, temp_frame: Frame) -> Frame:
+    def Run(self, source_faceset: FaceSet, target_face: Face, temp_frame: Frame) -> Frame:
         input_size = temp_frame.shape[1]
 
-        result = self.enhance_face(source_face, temp_frame, target_face)
+        result = self.enhance_face(source_faceset, temp_frame, target_face)
         scale_factor = int(result.shape[1] / input_size)       
         return result.astype(np.uint8), scale_factor
 
@@ -91,13 +89,9 @@ class Enhance_DMDNet():
         return new_pts
 
 
-    def enhance_face(self, ref_face, temp_frame, face):
+    def enhance_face(self, ref_faceset: FaceSet, temp_frame, face: Face):
         # preprocess
         start_x, start_y, end_x, end_y = map(int, face['bbox'])
-        width = end_x - start_x
-        height = end_y - start_y
-        
-        
         lm106 = face.landmark_2d_106
         lq_landmarks = np.asarray(self.landmarks106_to_68(lm106))
 
@@ -120,35 +114,49 @@ class Enhance_DMDNet():
         LQLocs = get_component_location(lq_landmarks)
         # self.check_bbox(lq, LQLocs.unsqueeze(0))
 
-        # specific
-        # start_x, start_y, end_x, end_y = map(int, ref_face['bbox'])
-        # temp_face = temp_frame[start_y:end_y, start_x:end_x]
-        # if temp_face.size:
-        #     SpecificImgs = []
-        #     SpecificLocs = []
-        #     lm106 = ref_face.landmark_2d_106
-        #     ref_landmarks = asarray(self.landmarks106_to_68(lm106))
-        #     ref_tensor, ref_landmarks, _ = read_img_tensor(clip, ref_landmarks)
-        #     SpecificImgs.append(ref_tensor)
-        #     ref_locs = get_component_location(ref_landmarks)
-        #     SpecificLocs.append(ref_locs.unsqueeze(0))
+        # specific, change 1000 to 1 to activate
+        if len(ref_faceset.faces) > 1000:
+            SpecificImgs = []
+            SpecificLocs = []
+            for i,face in enumerate(ref_faceset.faces):
+                lm106 = face.landmark_2d_106
+                lq_landmarks = np.asarray(self.landmarks106_to_68(lm106))
+                ref_image = ref_faceset.ref_images[i]
+                if ref_image.shape[0] != 512 or ref_image.shape[1] != 512:
+                    # scale to 512x512
+                    scale_factor = 512 / ref_image.shape[1]
 
-        #     SpecificImgs = torch.cat(SpecificImgs, dim=0)
-        #     SpecificLocs = torch.cat(SpecificLocs, dim=0)
-        #     # check_bbox(SpecificImgs, SpecificLocs)
-        #     SpMem256, SpMem128, SpMem64 = DMDNet.generate_specific_dictionary(sp_imgs = SpecificImgs.to(device), sp_locs = SpecificLocs)
-        #     SpMem256Para = {}
-        #     SpMem128Para = {}
-        #     SpMem64Para = {}
-        #     for k, v in SpMem256.items():
-        #         SpMem256Para[k] = v
-        #     for k, v in SpMem128.items():
-        #         SpMem128Para[k] = v
-        #     for k, v in SpMem64.items():
-        #         SpMem64Para[k] = v
+                    M = face.matrix * scale_factor
 
-        # generic
-        SpMem256Para, SpMem128Para, SpMem64Para = None, None, None
+                    lq_landmarks = self.trans_points2d(lq_landmarks, M)
+                    ref_image = cv2.resize(ref_image, (512,512), interpolation = cv2.INTER_AREA)
+
+                if ref_image.ndim == 2:
+                    temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_GRAY2RGB)  # GGG
+                # else:
+                #     temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_BGR2RGB)  # RGB
+
+                ref_tensor = read_img_tensor(ref_image)
+                ref_locs = get_component_location(lq_landmarks)
+                SpecificImgs.append(ref_tensor)
+                SpecificLocs.append(ref_locs.unsqueeze(0))
+
+            SpecificImgs = torch.cat(SpecificImgs, dim=0)
+            SpecificLocs = torch.cat(SpecificLocs, dim=0)
+            # check_bbox(SpecificImgs, SpecificLocs)
+            SpMem256, SpMem128, SpMem64 = self.model_dmdnet.generate_specific_dictionary(sp_imgs = SpecificImgs.to(self.torchdevice), sp_locs = SpecificLocs)
+            SpMem256Para = {}
+            SpMem128Para = {}
+            SpMem64Para = {}
+            for k, v in SpMem256.items():
+                SpMem256Para[k] = v
+            for k, v in SpMem128.items():
+                SpMem128Para[k] = v
+            for k, v in SpMem64.items():
+                SpMem64Para[k] = v
+        else:
+            # generic
+            SpMem256Para, SpMem128Para, SpMem64Para = None, None, None
 
         with torch.no_grad():
             with THREAD_LOCK_DMDNET:
@@ -164,9 +172,14 @@ class Enhance_DMDNet():
         check_lq = lq * 0.5 + 0.5
         check_lq = check_lq.squeeze(0).permute(1, 2, 0).flip(2) # RGB->BGR
         check_lq = np.clip(check_lq.float().cpu().numpy(), 0, 1) * 255.0
-        enhanced_img =  np.hstack((check_lq, save_generic))
         temp_frame =  save_generic.astype("uint8")
         temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_RGB2BGR)  # RGB
+
+        if SpecificResult is not None:
+            save_specific = SpecificResult * 0.5 + 0.5
+            save_specific = save_specific.squeeze(0).permute(1, 2, 0).flip(2) # RGB->BGR
+            save_specific = np.clip(save_specific.float().cpu().numpy(), 0, 1) * 255.0
+            #cv2.imwrite('yesyes.png', cv2.cvtColor(np.hstack((check_lq, save_generic, save_specific)),cv2.COLOR_RGB2BGR))
         return temp_frame
     
 
