@@ -115,7 +115,7 @@ class Enhance_DMDNet():
         # self.check_bbox(lq, LQLocs.unsqueeze(0))
 
         # specific, change 1000 to 1 to activate
-        if len(ref_faceset.faces) > 1000:
+        if len(ref_faceset.faces) > 1:
             SpecificImgs = []
             SpecificLocs = []
             for i,face in enumerate(ref_faceset.faces):
@@ -138,6 +138,8 @@ class Enhance_DMDNet():
 
                 ref_tensor = read_img_tensor(ref_image)
                 ref_locs = get_component_location(lq_landmarks)
+                # self.check_bbox(ref_tensor, ref_locs.unsqueeze(0))
+
                 SpecificImgs.append(ref_tensor)
                 SpecificLocs.append(ref_locs.unsqueeze(0))
 
@@ -165,22 +167,28 @@ class Enhance_DMDNet():
                 except Exception as e:
                     print(f'Error {e} there may be something wrong with the detected component locations.')
                     return temp_frame
-        save_generic = GenericResult * 0.5 + 0.5
-        save_generic = save_generic.squeeze(0).permute(1, 2, 0).flip(2) # RGB->BGR
-        save_generic = np.clip(save_generic.float().cpu().numpy(), 0, 1) * 255.0
-
-        check_lq = lq * 0.5 + 0.5
-        check_lq = check_lq.squeeze(0).permute(1, 2, 0).flip(2) # RGB->BGR
-        check_lq = np.clip(check_lq.float().cpu().numpy(), 0, 1) * 255.0
-        temp_frame =  save_generic.astype("uint8")
-        temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_RGB2BGR)  # RGB
-
+        
         if SpecificResult is not None:
             save_specific = SpecificResult * 0.5 + 0.5
             save_specific = save_specific.squeeze(0).permute(1, 2, 0).flip(2) # RGB->BGR
             save_specific = np.clip(save_specific.float().cpu().numpy(), 0, 1) * 255.0
-            #cv2.imwrite('yesyes.png', cv2.cvtColor(np.hstack((check_lq, save_generic, save_specific)),cv2.COLOR_RGB2BGR))
+            temp_frame =  save_specific.astype("uint8")
+            if False:
+                save_generic = GenericResult * 0.5 + 0.5
+                save_generic = save_generic.squeeze(0).permute(1, 2, 0).flip(2) # RGB->BGR
+                save_generic = np.clip(save_generic.float().cpu().numpy(), 0, 1) * 255.0
+                check_lq = lq * 0.5 + 0.5
+                check_lq = check_lq.squeeze(0).permute(1, 2, 0).flip(2) # RGB->BGR
+                check_lq = np.clip(check_lq.float().cpu().numpy(), 0, 1) * 255.0
+                cv2.imwrite('dmdnet_comparison.png', cv2.cvtColor(np.hstack((check_lq, save_generic, save_specific)),cv2.COLOR_RGB2BGR))
+        else:
+            save_generic = GenericResult * 0.5 + 0.5
+            save_generic = save_generic.squeeze(0).permute(1, 2, 0).flip(2) # RGB->BGR
+            save_generic = np.clip(save_generic.float().cpu().numpy(), 0, 1) * 255.0
+            temp_frame =  save_generic.astype("uint8")
+        temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_RGB2BGR)  # RGB
         return temp_frame
+
     
 
     def create(self, devicename):
