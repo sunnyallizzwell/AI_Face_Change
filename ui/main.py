@@ -2,10 +2,9 @@ import os
 import time
 import gradio as gr
 import roop.globals
-import ui.globals
 import roop.metadata
 import roop.utilities as util
-from roop.ProcessEntry import ProcessEntry
+import ui.globals as uii
 
 from ui.tabs.faceswap_tab import faceswap_tab
 from ui.tabs.livecam_tab import livecam_tab
@@ -29,17 +28,15 @@ def prepare_environment():
 
 def run():
     from roop.core import decode_execution_providers, set_display_ui
-    global ui_input_faces, ui_target_faces, ui_face_selection, ui_fake_cam_image, ui_restart_server, live_cam_active, on_settings_changed
 
     prepare_environment()
 
-    live_cam_active = roop.globals.CFG.live_cam_start_active
     set_display_ui(show_msg)
     roop.globals.execution_providers = decode_execution_providers([roop.globals.CFG.provider])
     print(f'Using provider {roop.globals.execution_providers} - Device:{util.get_device()}')    
     
-
     run_server = True
+    uii.ui_restart_server = False
     mycss = """
         span {color: var(--block-info-text-color)}
         #fixedheight {
@@ -66,15 +63,15 @@ def run():
             extras_tab()
             settings_tab()
 
-        ui_restart_server = False
+        uii.ui_restart_server = False
         try:
             ui.queue().launch(inbrowser=True, server_name=server_name, server_port=server_port, share=roop.globals.CFG.server_share, ssl_verify=ssl_verify, prevent_thread_lock=True, show_error=True)
         except Exception as e:
             print(f'Exception {e} when launching Gradio Server!')
-            ui_restart_server = True
+            uii.ui_restart_server = True
             run_server = False
         try:
-            while ui_restart_server == False:
+            while uii.ui_restart_server == False:
                 time.sleep(1.0)
         except (KeyboardInterrupt, OSError):
             print("Keyboard interruption in main thread... closing server.")

@@ -2,6 +2,7 @@ import shutil
 import os
 import gradio as gr
 import roop.globals
+import ui.globals
 
 available_themes = ["Default", "gradio/glass", "gradio/monochrome", "gradio/seafoam", "gradio/soft", "gstaff/xkcd", "freddyaboulton/dracula_revamped", "ysharma/steampunk"]
 image_formats = ['jpg','png', 'webp']
@@ -13,7 +14,7 @@ settings_controls = []
 
 def settings_tab():
     from roop.core import suggest_execution_providers
-    global bt_srcfiles, input_faces, target_faces, bt_destfiles, providerlist
+    global providerlist
 
     providerlist = suggest_execution_providers()
     with gr.Tab("⚙ Settings"):
@@ -98,15 +99,14 @@ def on_settings_changed(evt: gr.SelectData):
 
 def clean_temp():
     from ui.main import prepare_environment
-    global input_thumbs, target_thumbs
     
     shutil.rmtree(os.environ["TEMP"])
     prepare_environment()
    
-    input_thumbs.clear()
+    ui.globals.ui_input_thumbs.clear()
     roop.globals.INPUT_FACESETS.clear()
     roop.globals.TARGET_FACES.clear()
-    target_thumbs = []
+    ui.globals.ui_target_thumbs = []
     gr.Info('Temp Files removed')
     return None,None,None,None
 
@@ -123,5 +123,4 @@ def apply_settings(themes, input_server_name, input_server_port, output_template
 
 
 def restart():
-    global restart_server
-    restart_server = True
+    ui.globals.ui_restart_server = True

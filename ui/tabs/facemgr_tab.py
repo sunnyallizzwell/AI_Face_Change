@@ -45,7 +45,8 @@ def on_faceset_changed(faceset, progress=gr.Progress()):
 
     if faceset is None:
         return thumbs
-    
+
+    thumbs.clear()
     filename = faceset.name
         
     if filename.lower().endswith('fsz'):
@@ -105,8 +106,8 @@ def on_remove_clicked():
 def on_clear_clicked():
     global thumbs, images
 
-    thumbs = []
-    images = []
+    thumbs.clear()
+    images.clear()
     return thumbs, None, None
 
 

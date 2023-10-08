@@ -64,6 +64,7 @@ class ProcessMgr():
     'codeformer'    : 'Enhance_CodeFormer',
     'gfpgan'        : 'Enhance_GFPGAN',
     'dmdnet'        : 'Enhance_DMDNet',
+    'gpen'          : 'Enhance_GPEN',
     }
 
     def __init__(self, progress):
