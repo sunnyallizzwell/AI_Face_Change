@@ -191,7 +191,6 @@ def on_srcfile_changed(srcfiles, progress=gr.Progress()):
     thumbs = []
     for f in srcfiles:    
         source_path = f.name
-        face_set = FaceSet()
         if source_path.lower().endswith('fsz'):
             progress(0, desc="Retrieving faces from Faceset File", )      
             unzipfolder = '/temp/faceset'
@@ -203,6 +202,7 @@ def on_srcfile_changed(srcfiles, progress=gr.Progress()):
                 os.makedirs(unzipfolder)
             util.unzip(source_path, unzipfolder)
             is_first = True
+            face_set = FaceSet()
             for file in os.listdir(unzipfolder):
                 if file.endswith(".png"):
                     filename = os.path.join(unzipfolder,file)
@@ -222,30 +222,29 @@ def on_srcfile_changed(srcfiles, progress=gr.Progress()):
                     face_set.AverageEmbeddings()
                 roop.globals.INPUT_FACESETS.append(face_set)
                                         
-        elif util.is_image(source_path):
+        elif util.has_image_extension(source_path):
             progress(0, desc="Retrieving faces from image", )      
             roop.globals.source_path = source_path
             SELECTION_FACES_DATA = extract_face_images(roop.globals.source_path,  (False, 0))
             progress(0.5, desc="Retrieving faces from image")
-            if len(SELECTION_FACES_DATA) == 1:
-                f = SELECTION_FACES_DATA[0]
+            for f in SELECTION_FACES_DATA:
+                face_set = FaceSet()
                 face = f[0]
                 face.mask_offsets = (0,0)
                 face_set.faces.append(face)
                 image = util.convert_to_gradio(f[1])
                 ui.globals.ui_input_thumbs.append(image)
                 roop.globals.INPUT_FACESETS.append(face_set)
-            else:
-                for f in SELECTION_FACES_DATA:
-                    image = util.convert_to_gradio(f[1])
-                    thumbs.append(image)
                 
-        progress(1.0)
+    progress(1.0)
 
-    if len(thumbs) < 1:     
-        return gr.Column.update(visible=False), None, ui.globals.ui_input_thumbs
-       
-    return gr.Column.update(visible=True), thumbs, gr.Gallery.update(visible=True)
+    # old style with selecting input faces commented out
+    # if len(thumbs) < 1:     
+    #     return gr.Column.update(visible=False), None, ui.globals.ui_input_thumbs
+    # return gr.Column.update(visible=True), thumbs, gr.Gallery.update(visible=True)
+
+    return gr.Column.update(visible=False), None, ui.globals.ui_input_thumbs
+
 
 def on_select_input_face(evt: gr.SelectData):
     global SELECTED_INPUT_FACE_INDEX
