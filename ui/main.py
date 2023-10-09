@@ -44,6 +44,7 @@ def run():
             overflow-y: auto !important;
         }
 """
+    uii.ui_live_cam_active = roop.globals.CFG.live_cam_start_active
 
     while run_server:
         server_name = roop.globals.CFG.server_name

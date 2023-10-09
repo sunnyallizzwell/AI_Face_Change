@@ -31,8 +31,6 @@ list_files_process : list[ProcessEntry] = []
 
 
 def faceswap_tab():
-    from ui.globals import ui_selected_enhancer, ui_blend_ratio
-    
     with gr.Tab("🎭 Face Swap"):
         with gr.Row(variant='panel'):
             with gr.Column(scale=2):
@@ -84,8 +82,8 @@ def faceswap_tab():
                 video_swapping_method = gr.Dropdown(["Extract Frames to media","In-Memory processing"], value="In-Memory processing", label="Select video processing method", interactive=True)
                 _ = gr.Dropdown(["Use untouched original frame","Retry rotated", "Skip Frame"], value="Use untouched original frame", label="Action on no face detected", interactive=False)
             with gr.Column(scale=1):
-                ui_selected_enhancer = gr.Dropdown(["None", "Codeformer", "DMDNet", "GFPGAN", "GPEN"], value="None", label="Select post-processing")
-                ui_blend_ratio = gr.Slider(0.0, 1.0, value=0.65, label="Original/Enhanced image blend ratio")
+                ui.globals.ui_selected_enhancer = gr.Dropdown(["None", "Codeformer", "DMDNet", "GFPGAN", "GPEN"], value="None", label="Select post-processing")
+                ui.globals.ui_blend_ratio = gr.Slider(0.0, 1.0, value=0.65, label="Original/Enhanced image blend ratio")
                 with gr.Box():
                     roop.globals.skip_audio = gr.Checkbox(label="Skip audio", value=False)
                     roop.globals.keep_frames = gr.Checkbox(label="Keep Frames (relevant only when extracting frames)", value=False)
@@ -111,8 +109,8 @@ def faceswap_tab():
                 resultimage = gr.Image(type='filepath', label='Final Image', interactive=False )
                 resultvideo = gr.Video(label='Final Video', interactive=False, visible=False)
 
-    previewinputs = [preview_frame_num, bt_destfiles, fake_preview, ui_selected_enhancer, selected_face_detection,
-                        max_face_distance, ui_blend_ratio, chk_useclip, clip_text] 
+    previewinputs = [preview_frame_num, bt_destfiles, fake_preview, ui.globals.ui_selected_enhancer, selected_face_detection,
+                        max_face_distance, ui.globals.ui_blend_ratio, chk_useclip, clip_text] 
     input_faces.select(on_select_input_face, None, None).then(fn=on_preview_frame_changed, inputs=previewinputs, outputs=[previewimage, mask_top, mask_bottom])
     bt_remove_selected_input_face.click(fn=remove_selected_input_face, outputs=[input_faces])
     bt_srcfiles.change(fn=on_srcfile_changed, show_progress='full', inputs=bt_srcfiles, outputs=[dynamic_face_selection, face_selection, input_faces])
@@ -141,8 +139,8 @@ def faceswap_tab():
     bt_preview_mask.click(fn=on_preview_mask, inputs=[preview_frame_num, bt_destfiles, clip_text], outputs=[previewimage]) 
 
     start_event = bt_start.click(fn=start_swap, 
-        inputs=[ui_selected_enhancer, selected_face_detection, roop.globals.keep_frames,
-                    roop.globals.skip_audio, max_face_distance, ui_blend_ratio, chk_useclip, clip_text,video_swapping_method],
+        inputs=[ui.globals.ui_selected_enhancer, selected_face_detection, roop.globals.keep_frames,
+                    roop.globals.skip_audio, max_face_distance, ui.globals.ui_blend_ratio, chk_useclip, clip_text,video_swapping_method],
         outputs=[bt_start, resultfiles])
     after_swap_event = start_event.then(fn=on_resultfiles_finished, inputs=[resultfiles], outputs=[resultimage, resultvideo])
     

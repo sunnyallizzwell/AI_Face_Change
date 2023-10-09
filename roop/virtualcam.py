@@ -11,6 +11,7 @@ vcam = None
 
 def virtualcamera(cam_num):
     from roop.core import live_swap
+    global cam_active
 
     time.sleep(2)
     print('Starting capture')
@@ -23,7 +24,7 @@ def virtualcamera(cam_num):
 
     pref_width = 1280
     pref_height = 720
-    pref_fps_in = 10
+    pref_fps_in = 30
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, pref_width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, pref_height)
     cap.set(cv2.CAP_PROP_FPS, pref_fps_in)
@@ -32,7 +33,7 @@ def virtualcamera(cam_num):
 
     # native format UYVY
 
-    with pyvirtualcam.Camera(width=pref_width, height=pref_height, fps=10, fmt=pyvirtualcam.PixelFormat.BGR, print_fps=True) as cam:
+    with pyvirtualcam.Camera(width=pref_width, height=pref_height, fps=pref_fps_in, fmt=pyvirtualcam.PixelFormat.BGR, print_fps=True) as cam:
 
         print(f'Using virtual camera: {cam.device}')
         print(f'Using {cam.native_fmt}')

@@ -9,8 +9,6 @@ cam_swapping = False
 camthread = None
 
 def livecam_tab():
-    ui.globals.ui_live_cam_active = roop.globals.CFG.live_cam_start_active
-
     with gr.Tab("🎥 Live Cam"):
         with gr.Row():
             with gr.Column(scale=2):
@@ -23,7 +21,7 @@ def livecam_tab():
         if ui.globals.ui_live_cam_active:
             with gr.Row():
                 with gr.Column():
-                    cam = gr.Webcam(label='Camera', source='webcam', mirror_webcam=True, interactive=True, streaming=False)
+                    cam = gr.Webcam(label='Camera', source='webcam', interactive=True, streaming=False)
                 with gr.Column():
                     fake_cam_image = gr.Image(label='Fake Camera Output', interactive=False)
 
@@ -42,11 +40,12 @@ def on_vcam_toggle(state, num):
     from roop.virtualcam import stop_virtual_cam, start_virtual_cam
 
     if state:
+        yield gr.Webcam.update(interactive=False), None
         start_virtual_cam(num)
         return gr.Webcam.update(interactive=False), None
     else:
         stop_virtual_cam()
-    return gr.Webcam.update(interactive=True, mirror_webcam=True), None
+    return gr.Webcam.update(interactive=True), None
 
 
 
