@@ -8,7 +8,7 @@ import roop.metadata
 from typing import Callable, Tuple
 from PIL import Image, ImageOps
 from roop.face_analyser import get_many_faces, get_one_face, extract_face_images
-from roop.capturer import get_video_frame, get_video_frame_total
+from roop.capturer import get_video_frame2, get_video_frame_total
 #from roop.predicter import predict_frame
 from roop.processors.frame.core import get_frame_processors_modules
 from roop.utilities import is_image, is_video, resolve_relative_path, open_with_default_app, compute_cosine_distance, has_extension
@@ -145,7 +145,7 @@ def create_preview(parent: ctk.CTkToplevel) -> ctk.CTkToplevel:
     preview_label.pack(fill='both', expand=True)
 
     preview_slider = ctk.CTkSlider(preview, from_=0, to=0, command=lambda frame_value: update_preview(frame_value))
-
+    preview.cv2vid=None
     return preview
 
 def update_status(text: str) -> None:
@@ -310,10 +310,16 @@ def render_video_preview(video_path: str, size: Tuple[int, int], frame_number: i
     capture.release()
     cv2.destroyAllWindows()
 
+def close_preview_video():
+    if PREVIEW.cv2vid is None:
+        return
+    PREVIEW.cv2vid.release()
+    PREVIEW.cv2vid=None
 
 def toggle_preview() -> None:
     if PREVIEW.state() == 'normal':
         PREVIEW.withdraw()
+        close_preview_video()
     elif roop.globals.source_path and roop.globals.target_path:
         init_preview()
         update_preview()
@@ -324,7 +330,9 @@ def init_preview() -> None:
     if is_image(roop.globals.target_path):
         preview_slider.pack_forget()
     if is_video(roop.globals.target_path):
-        video_frame_total = get_video_frame_total(roop.globals.target_path)
+        close_preview_video()
+        PREVIEW.cv2vid = cv2.VideoCapture(roop.globals.target_path)
+        video_frame_total = int(PREVIEW.cv2vid.get(cv2.CAP_PROP_FRAME_COUNT))
         preview_slider.configure(to=video_frame_total)
         preview_slider.pack(fill='x')
         preview_slider.set(0)
@@ -332,7 +340,7 @@ def init_preview() -> None:
 
 def update_preview(frame_number: int = 0) -> None:
     if roop.globals.source_path and roop.globals.target_path:
-        temp_frame = get_video_frame(roop.globals.target_path, frame_number)
+        temp_frame = get_video_frame2(PREVIEW.cv2vid, frame_number)
 
         for frame_processor in get_frame_processors_modules(roop.globals.frame_processors):
             if frame_processor.NAME == 'ROOP.FACE-ENHANCER':
