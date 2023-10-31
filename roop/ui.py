@@ -7,7 +7,7 @@ import roop.metadata
 from typing import Callable, Tuple
 from PIL import Image, ImageOps
 from roop.face_analyser import extract_face_images
-from roop.capturer import get_video_frame, get_video_frame2, get_video_frame_total
+from roop.capturer import get_video_frame2, get_video_frame_total
 from roop.processors.frame.core import get_frame_processors_modules
 from roop.utilities import is_image, is_video, resolve_relative_path, open_with_default_app, compute_cosine_distance, has_extension
 
