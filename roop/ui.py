@@ -4,12 +4,10 @@ import webbrowser
 import cv2
 import roop.globals
 import roop.metadata
-
 from typing import Callable, Tuple
 from PIL import Image, ImageOps
-from roop.face_analyser import get_many_faces, get_one_face, extract_face_images
-from roop.capturer import get_video_frame2, get_video_frame_total
-#from roop.predicter import predict_frame
+from roop.face_analyser import extract_face_images
+from roop.capturer import get_video_frame, get_video_frame2, get_video_frame_total
 from roop.processors.frame.core import get_frame_processors_modules
 from roop.utilities import is_image, is_video, resolve_relative_path, open_with_default_app, compute_cosine_distance, has_extension
 
@@ -44,7 +42,6 @@ def init(start: Callable, destroy: Callable) -> ctk.CTk:
     PREVIEW = create_preview(ROOT)
     FACE_SELECT = create_select_faces_win(ROOT)
     return ROOT
-
 
 
 def create_root(start: Callable, destroy: Callable) -> ctk.CTk:
@@ -102,8 +99,6 @@ def create_root(start: Callable, destroy: Callable) -> ctk.CTk:
     use_batch_switch = ctk.CTkSwitch(root, text='Batch process folder', variable=use_batch_value, command=lambda: setattr(roop.globals, 'use_batch', use_batch_value.get()))
     use_batch_switch.place(relx=base_x1, rely=0.725)
 
-
-
     base_y = 0.84
 
     start_button = ctk.CTkButton(root, text='Start', command=lambda: select_output_path(start))
@@ -128,8 +123,6 @@ def create_root(start: Callable, destroy: Callable) -> ctk.CTk:
 
     return root
 
-def create_preview(parent) -> ctk.CTkToplevel:
-    global preview_label, preview_slider
 
 def create_preview(parent: ctk.CTkToplevel) -> ctk.CTkToplevel:
     global preview_label, preview_slider
@@ -148,9 +141,6 @@ def create_preview(parent: ctk.CTkToplevel) -> ctk.CTkToplevel:
     preview.cv2vid=None
     return preview
 
-def update_status(text: str) -> None:
-    status_label.configure(text=text)
-    ROOT.update()
 
 def update_status(text: str) -> None:
     status_label.configure(text=text)
@@ -160,7 +150,7 @@ def update_status(text: str) -> None:
 def select_source_path() -> None:
     global RECENT_DIRECTORY_SOURCE, INPUT_FACES_DATA
 
-    PREVIEW.withdraw()
+    withdraw_preview()
     source_path = ctk.filedialog.askopenfilename(title='Select source image', initialdir=RECENT_DIRECTORY_SOURCE)
     image = None
     if is_image(source_path):
@@ -185,7 +175,7 @@ def select_source_path() -> None:
 def select_target_path() -> None:
     global RECENT_DIRECTORY_TARGET, OUTPUT_FACES_DATA
 
-    PREVIEW.withdraw()
+    withdraw_preview()
     target_path = ctk.filedialog.askopenfilename(title='Select target image or video', initialdir=RECENT_DIRECTORY_TARGET)
     image = None
     if is_image(target_path) and not target_path.lower().endswith(('gif')):
@@ -245,11 +235,6 @@ def select_target_path() -> None:
     target_button._draw()
 
 
-
-def select_output_path(start):
-    global RECENT_DIRECTORY_OUTPUT
-
-
 def select_output_path(start: Callable[[], None]) -> None:
     global RECENT_DIRECTORY_OUTPUT
 
@@ -258,7 +243,6 @@ def select_output_path(start: Callable[[], None]) -> None:
         print(f'Batch process folder set to {roop.globals.target_folder_path}')
     else:
         roop.globals.target_folder_path = None
-
 
     if roop.globals.target_folder_path is not None:
         output_path = ctk.filedialog.askdirectory(title='Select output folder')
@@ -281,7 +265,6 @@ def select_enhancer(choice):
 
 def show_result():
     open_with_default_app(roop.globals.output_path)
-
 
 
 def render_image_preview(image_path: str, size: Tuple[int, int]) -> ctk.CTkImage:
@@ -310,16 +293,17 @@ def render_video_preview(video_path: str, size: Tuple[int, int], frame_number: i
     capture.release()
     cv2.destroyAllWindows()
 
-def close_preview_video():
-    if PREVIEW.cv2vid is None:
-        return
+
+def withdraw_preview():
+    PREVIEW.withdraw()
+    if PREVIEW.cv2vid is None: return
     PREVIEW.cv2vid.release()
     PREVIEW.cv2vid=None
 
+
 def toggle_preview() -> None:
     if PREVIEW.state() == 'normal':
-        PREVIEW.withdraw()
-        close_preview_video()
+        withdraw_preview()
     elif roop.globals.source_path and roop.globals.target_path:
         init_preview()
         update_preview()
@@ -330,7 +314,6 @@ def init_preview() -> None:
     if is_image(roop.globals.target_path):
         preview_slider.pack_forget()
     if is_video(roop.globals.target_path):
-        close_preview_video()
         PREVIEW.cv2vid = cv2.VideoCapture(roop.globals.target_path)
         video_frame_total = int(PREVIEW.cv2vid.get(cv2.CAP_PROP_FRAME_COUNT))
         preview_slider.configure(to=video_frame_total)
@@ -340,7 +323,10 @@ def init_preview() -> None:
 
 def update_preview(frame_number: int = 0) -> None:
     if roop.globals.source_path and roop.globals.target_path:
-        temp_frame = get_video_frame2(PREVIEW.cv2vid, frame_number)
+        if PREVIEW.cv2vid is None:
+            temp_frame = cv2.imread(roop.globals.target_path)
+        else:
+            temp_frame = get_video_frame2(PREVIEW.cv2vid, frame_number)
 
         for frame_processor in get_frame_processors_modules(roop.globals.frame_processors):
             if frame_processor.NAME == 'ROOP.FACE-ENHANCER':
@@ -370,10 +356,12 @@ def create_select_faces_win(parent) -> ctk.CTkToplevel:
 
     return face_win
 
+
 def cancel_face_selection() -> None:
     toggle_face_selection();
     ROOT.wm_attributes('-disabled', False)
     ROOT.focus()
+
 
 def select_face(index, is_input) -> None:
     global source_button, target_button, INPUT_FACES_DATA, OUTPUT_FACES_DATA
@@ -397,7 +385,6 @@ def select_face(index, is_input) -> None:
     toggle_face_selection();
     ROOT.wm_attributes('-disabled', False)
     ROOT.focus()
-
 
 
 def toggle_face_selection() -> None:

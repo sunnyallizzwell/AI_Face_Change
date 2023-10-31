@@ -21,6 +21,7 @@ def get_video_frame_total(video_path: str) -> int:
     capture.release()
     return video_frame_total
 
+
 def get_video_frame2(capture,frame_number: int = 0) -> Optional[Frame]:
     frame_total = capture.get(cv2.CAP_PROP_FRAME_COUNT)
     capture.set(cv2.CAP_PROP_POS_FRAMES, min(frame_total, frame_number - 1))
